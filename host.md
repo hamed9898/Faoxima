@@ -39,7 +39,7 @@ https://github.com/Mmd-Amir/Faoxima/releases
  #### 2️⃣مسیر زیر را در مرورگر باز کنید (به جای domin.ir و Faoximabot دامنه و مسیر استخراج شده‌ی خودتان را وارد کنید):
 
 ```
-https://domin.ir/Faoximabot/installer
+https://domin.ir/Faoxima/installer
 ```
 
 </details>
@@ -64,7 +64,7 @@ https://domin.ir/Faoximabot/installer
 
 
 ```
-https://domin.ir/Faoximabot/index.php
+https://domin.ir/Faoxima/index.php
 ```
 
 
