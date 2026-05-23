@@ -56,6 +56,42 @@
 
 
 
+ #### **آموزش نصب هاست**
+
+<details>
+  <summary> نصب </summary>
+
+👉 [سیپنل / aapanel](https://github.com/Mmd-Amir/Faoxima/blob/main/host.md)
+
+
+  
+
+</details>
+
+---
+
+
+---
+
+
+
+ #### **آموزش نصب سرور**
+
+<details>
+  <summary> نصب </summary>
+
+👉 [سرور اوبونتو 22](https://github.com/Mmd-Amir/Faoxima/blob/main/server.md)
+  
+
+</details>
+
+---
+
+
+
+
+
+
 #### **📊  اطلاعات کلی**
 
 
