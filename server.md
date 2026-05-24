@@ -27,7 +27,7 @@
 
   #### 1️⃣ ابتدا اسکریپت زیر را بر روی سرور اجرا کنید.
  ```
-  bash -c "$(curl -L https://raw.githubusercontent.com/Mmd-Amir/Faoxima/main/install.sh)"
+  curl -L -o /root/install.sh https://raw.githubusercontent.com/Mmd-Amir/Faoxima/main/install.sh && bash /root/install.sh
 ```
 
 #### 2️⃣ سپس گزینهٔ «1» را انتخاب کرده و اطلاعات مورد نیاز را مطابق درخواست وارد نمایید.
