@@ -21,8 +21,10 @@ final class FaoximaAuth
             if ($rawData === '') {
                 throw new InvalidArgumentException('Telegram init data is missing or invalid');
             }
-            $decoded = html_entity_decode($rawData, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            parse_str($decoded, $initData);
+            // Telegram spec: parse the raw initData as a query string. No
+            // html_entity_decode — it can corrupt URL-encoded values whose
+            // bytes happen to resemble HTML5 named entities.
+            parse_str($rawData, $initData);
         } elseif (is_array($rawData)) {
             $initData = $rawData;
         } else {
@@ -39,12 +41,11 @@ final class FaoximaAuth
         $receivedHash = (string)$initData['hash'];
         unset($initData['hash']);
 
+        // Telegram spec: build data_check_string from EVERY remaining field
+        // (including empty ones), sorted by key, joined with \n as `key=value`.
         $checkArr = [];
         foreach ($initData as $key => $value) {
-            if ($value === null) continue;
-            $strValue = self::normalize($value);
-            if ($strValue === '') continue;
-            $checkArr[] = $key . '=' . $strValue;
+            $checkArr[] = $key . '=' . self::normalize($value);
         }
         if ($checkArr === []) {
             throw new InvalidArgumentException('Telegram init data payload is empty');

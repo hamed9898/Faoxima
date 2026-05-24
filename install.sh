@@ -871,16 +871,33 @@ show_menu() {
 grant_file_permissions() {
     local path="${1:-$BOT_DIR}"
     [ -d "$path" ] || return 0
-    ui_action "Setting file permissions for ${path}..."
-    [ -f "${path}/config.php" ] && chmod 666 "${path}/config.php" 2>/dev/null
-    [ -f "${path}/table.php" ]  && chmod 644 "${path}/table.php"  2>/dev/null
-    chmod 755 "$path" 2>/dev/null
+    ui_action "Setting file permissions for ${path} (recursive)..."
+
+    # 1) Recursive ownership to the web-server user for EVERY file in the root.
     chown -R www-data:www-data "$path" 2>/dev/null
-    if [ -d "${path}/app" ]; then
-        chmod 755 "${path}/app" 2>/dev/null
-        chown -R www-data:www-data "${path}/app" 2>/dev/null
-    fi
-    ui_ok "File permissions applied"
+
+    # 2) Sane baseline: directories 755, files 644 across the whole tree.
+    find "$path" -type d -exec chmod 755 {} + 2>/dev/null
+    find "$path" -type f -exec chmod 644 {} + 2>/dev/null
+
+    # 3) Writable bot config — the bot rewrites it from PHP.
+    [ -f "${path}/config.php" ] && chmod 666 "${path}/config.php" 2>/dev/null
+
+    # 4) Runtime writable directories — must be web-writable so the bot can
+    #    drop logs, cached pages, session blobs, payment receipts, etc.
+    local writable_dirs=(logs storage cache tmp sessions cron cronbot sub payment re vpnbot infocard_fonts)
+    local d
+    for d in "${writable_dirs[@]}"; do
+        if [ -d "${path}/${d}" ]; then
+            find "${path}/${d}" -type d -exec chmod 775 {} + 2>/dev/null
+            find "${path}/${d}" -type f -exec chmod 664 {} + 2>/dev/null
+        fi
+    done
+
+    # 5) Shell scripts at the root remain executable.
+    find "$path" -maxdepth 2 -type f -name '*.sh' -exec chmod 755 {} + 2>/dev/null
+
+    ui_ok "File permissions applied to all files under ${path}"
 }
 
 # ============================================================================
@@ -1706,6 +1723,8 @@ EOF
     curl -s "$TABLE_SETUP_URL" >/dev/null || {
         ui_warn "Failed to fetch ${TABLE_SETUP_URL} — please open it manually in a browser."
     }
+
+    grant_file_permissions "$BOT_DIR"
 
     clear
     show_logo
@@ -2770,9 +2789,14 @@ install_additional_bot() {
 
 <VirtualHost *:443>
     ServerName ${DOMAIN_NAME}
-    DocumentRoot /var/www/html/${BOT_NAME}
+    # DocumentRoot is /var/www/html (not /var/www/html/${BOT_NAME}) because the
+    # webhook URL, \$domainhosts, and table.php URL all include /${BOT_NAME}/ as
+    # a subpath — i.e. https://${DOMAIN_NAME}/${BOT_NAME}/index.php. Setting the
+    # docroot to the bot folder makes that path resolve under /var/www/html/${BOT_NAME}/${BOT_NAME}/
+    # and Apache returns 404 to every Telegram webhook delivery.
+    DocumentRoot /var/www/html
 
-    <Directory /var/www/html/${BOT_NAME}>
+    <Directory /var/www/html>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted

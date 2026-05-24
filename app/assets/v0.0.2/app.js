@@ -143,8 +143,24 @@ function showAccessError(err) {
 
         const retry = document.getElementById('retry-btn');
         if (retry) retry.addEventListener('click', () => {
+            // Telegram's in-app WebView (tdesktop especially) serves index.php
+            // and assets from disk cache on a plain location.reload(), so a
+            // failed verification stays "stuck" on the screen even after the
+            // server is fixed. __hardReload (in app/index.php) drops caches,
+            // service workers, and bumps a `_r=...` query param to force a
+            // fresh fetch of every resource.
+            if (typeof window.__hardReload === 'function') {
+                window.__hardReload();
+                return;
+            }
             try { sessionStorage.clear(); } catch (_) {}
-            location.reload();
+            try {
+                const u = new URL(location.href);
+                u.searchParams.set('_r', Date.now().toString(36));
+                location.replace(u.toString());
+            } catch (_) {
+                location.reload();
+            }
         });
     } catch (renderErr) {
         logErr('Error UI itself crashed: ' + (renderErr.message || renderErr),
