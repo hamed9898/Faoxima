@@ -116,19 +116,40 @@ final class PaymentReceiptHandler extends BaseHandler
         ], JSON_UNESCAPED_UNICODE);
 
 
-        $firstAdmin = array_shift($adminIds);
-        $fileId = $this->sendReceiptPhoto($apiKey, $firstAdmin, $tmp, (string)($f['type'] ?? 'image/jpeg'), $caption, $keyboard);
-        if ($fileId === null) {
-            FaoximaResponse::fail(502, '❌ ارسال رسید به ادمین ناموفق بود. لطفاً دوباره تلاش کنید.');
+        $fileId = null;
+        $failedAdmins = [];
+        $remainingAdmins = $adminIds;
+        while (!empty($remainingAdmins)) {
+            $candidate = array_shift($remainingAdmins);
+            $maybeFileId = $this->sendReceiptPhoto($apiKey, $candidate, $tmp, (string)($f['type'] ?? 'image/jpeg'), $caption, $keyboard);
+            if (is_string($maybeFileId) && $maybeFileId !== '') {
+                $fileId = $maybeFileId;
+                break;
+            }
+            $failedAdmins[] = $candidate;
         }
 
-
-        foreach ($adminIds as $adminId) {
-
-
-            $ok = $this->forwardReceiptByFileId($apiKey, $adminId, $fileId, $caption, $keyboard);
-            if (!$ok) {
-                $this->sendReceiptText($apiKey, $adminId, $caption, $keyboard);
+        if ($fileId === null) {
+            $textOk = false;
+            foreach ($failedAdmins as $adminId) {
+                if ($this->sendReceiptText($apiKey, $adminId, $caption, $keyboard)) {
+                    $textOk = true;
+                }
+            }
+            if (!$textOk) {
+                FaoximaLogger::warn('Receipt: all admins unreachable', ['admins' => $failedAdmins]);
+                FaoximaResponse::fail(502, '❌ ارسال رسید به ادمین ناموفق بود. لطفاً دوباره تلاش کنید.');
+            }
+        } else {
+            foreach ($failedAdmins as $adminId) {
+                if (!$this->forwardReceiptByFileId($apiKey, $adminId, $fileId, $caption, $keyboard)) {
+                    $this->sendReceiptText($apiKey, $adminId, $caption, $keyboard);
+                }
+            }
+            foreach ($remainingAdmins as $adminId) {
+                if (!$this->forwardReceiptByFileId($apiKey, $adminId, $fileId, $caption, $keyboard)) {
+                    $this->sendReceiptText($apiKey, $adminId, $caption, $keyboard);
+                }
             }
         }
 
@@ -150,11 +171,12 @@ final class PaymentReceiptHandler extends BaseHandler
         }
 
         FaoximaLogger::debug('Receipt uploaded', [
-            'order'    => $orderId,
-            'user_id'  => $this->user['id'],
-            'amount'   => $amount,
-            'admins'   => 1 + count($adminIds),
-            'first_admin' => $firstAdmin,
+            'order'         => $orderId,
+            'user_id'       => $this->user['id'],
+            'amount'        => $amount,
+            'admins'        => count($adminIds),
+            'failed_first'  => $failedAdmins,
+            'photo_ok'      => $fileId !== null,
         ]);
 
         FaoximaResponse::ok([
@@ -234,7 +256,7 @@ final class PaymentReceiptHandler extends BaseHandler
     }
 
 
-    private function sendReceiptText(string $apiKey, string $chatId, string $caption, string $keyboardJson): void
+    private function sendReceiptText(string $apiKey, string $chatId, string $caption, string $keyboardJson): bool
     {
         $url = 'https://api.telegram.org/bot' . $apiKey . '/sendMessage';
         $payload = [
@@ -252,8 +274,12 @@ final class PaymentReceiptHandler extends BaseHandler
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
         ]);
-        @curl_exec($ch);
+        $response = @curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        if ($httpCode !== 200 || !$response) return false;
+        $tg = json_decode((string)$response, true);
+        return is_array($tg) && !empty($tg['ok']);
     }
 }
 

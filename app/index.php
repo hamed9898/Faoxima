@@ -40,7 +40,7 @@ if (is_string($forwardedProto) && $forwardedProto !== '') {
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $apiUrl = rtrim($scheme . '://' . $host, '/') . $apiPath;
 
-$brandAppVersion = trim((string)@file_get_contents(__DIR__ . '/version')) ?: '0.0.1';
+$brandAppVersion = trim((string)@file_get_contents(__DIR__ . '/version')) ?: '0.0.2';
 
 
 $brandName = 'Faoxima';
@@ -99,7 +99,7 @@ $config = [
 
 $buildStamp = (string) @filemtime(__FILE__);
 if (!isset($version) || !is_string($version) || $version === '') {
-    $version = $brandAppVersion ?? '0.0.1';
+    $version = $brandAppVersion ?? '0.0.2';
 }
 $cacheBust = preg_replace('/[^A-Za-z0-9._-]/', '', (string)$version) . '.' . $buildStamp;
 
@@ -108,7 +108,7 @@ $sdkFallback = 'https://telegram.org/js/telegram-web-app.js';
 $cssUrl      = htmlspecialchars($assetPrefix . 'assets/css/app.css?v=' . $cacheBust, ENT_QUOTES);
 
 
-$jsUrl       = htmlspecialchars($assetPrefix . 'assets/v0.0.1/app.js?v=' . $cacheBust, ENT_QUOTES);
+$jsUrl       = htmlspecialchars($assetPrefix . 'assets/v0.0.2/app.js?v=' . $cacheBust, ENT_QUOTES);
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">

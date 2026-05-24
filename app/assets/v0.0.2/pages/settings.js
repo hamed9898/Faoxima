@@ -95,7 +95,7 @@ export async function settings(view) {
                 <div id="admin-brand-host"></div>
 
                 <div class="card-section">
-                    <p class="muted mono center" style="font-size:11px">نسخه: ${escapeHtml((function(){var v=(((window.__APP_CONFIG__||{}).version)||'0.0.1').toString();return /^v/i.test(v)?v:('v'+v);})())}</p>
+                    <p class="muted mono center" style="font-size:11px">نسخه: ${escapeHtml((function(){var v=(((window.__APP_CONFIG__||{}).version)||'0.0.2').toString();return /^v/i.test(v)?v:('v'+v);})())}</p>
                 </div>
             </div>
         </article>

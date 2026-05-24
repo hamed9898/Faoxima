@@ -47,9 +47,10 @@ export function startGatewayWatch(view, opts) {
     }
 
     const startedAt = Date.now();
+    const maxDeadline = startedAt + Number(timeoutSec) * 1000;
     const deadline = (Number(expiresAtSec) > 0)
-        ? (Number(expiresAtSec) * 1000)
-        : (startedAt + Number(timeoutSec) * 1000);
+        ? Math.min(Number(expiresAtSec) * 1000, maxDeadline)
+        : maxDeadline;
     let pollTimer = null;
     let countdownTimer = null;
     let isPolling = false;

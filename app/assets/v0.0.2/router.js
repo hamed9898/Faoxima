@@ -39,14 +39,17 @@ async function watchResumePage(view, encodedOrderId) {
         methodStr = String(obj.method || '').toLowerCase();
         flowStr = String(obj.flow || '').toLowerCase();
 
+        const WATCH_WINDOW_SEC = 600;
+        const nowSec = Math.floor(Date.now() / 1000);
+        const hashAt = Number(obj.hash_at || 0);
         const expiresAtFromServer = Number(obj.expires_at || 0);
-        if (expiresAtFromServer > 0) {
-            expiresAtSec = expiresAtFromServer;
+
+        if (hashAt > 0) {
+            expiresAtSec = hashAt + WATCH_WINDOW_SEC;
+        } else if (expiresAtFromServer > 0) {
+            expiresAtSec = Math.min(expiresAtFromServer, nowSec + WATCH_WINDOW_SEC);
         } else {
-            const hashAt = Number(obj.hash_at || 0);
-            if (hashAt > 0) {
-                expiresAtSec = hashAt + 600;
-            }
+            expiresAtSec = nowSec + WATCH_WINDOW_SEC;
         }
     } catch (_) {  }
 

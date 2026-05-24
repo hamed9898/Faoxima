@@ -2467,8 +2467,15 @@ $textonebuy
 } elseif ($user['step'] == "get_step_payment") {
     if ($datain == "cart_to_offline") {
         $PaySetting = select("PaySetting", "ValuePay", "NamePay", "statuscardautoconfirm", "select")['ValuePay'];
-        $from_id_sql = mysqli_real_escape_string($connect, (string) $from_id);
-        $_stmt = $connect->prepare("SELECT * FROM Payment_report WHERE id_user = ? AND payment_Status = 'Unpaid'");
+        $from_id_sql = (string) $from_id;
+
+        $stale_cutoff = date('Y/m/d H:i:s', time() - 15 * 60);
+        $_purge = $connect->prepare("DELETE FROM Payment_report WHERE id_user = ? AND payment_Status = 'Unpaid' AND Payment_Method = 'cart to cart' AND time < ?");
+        $_purge->bind_param("ss", $from_id_sql, $stale_cutoff);
+        $_purge->execute();
+        $_purge->close();
+
+        $_stmt = $connect->prepare("SELECT id FROM Payment_report WHERE id_user = ? AND (payment_Status = 'Unpaid' OR payment_Status = 'waiting') AND Payment_Method = 'cart to cart' LIMIT 1");
         $_stmt->bind_param("s", $from_id_sql);
         $_stmt->execute();
         $checkpay = $_stmt->get_result();

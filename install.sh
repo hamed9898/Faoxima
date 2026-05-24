@@ -2,7 +2,7 @@
 # ============================================================================
 #  Faoxima Bot Installer
 # ----------------------------------------------------------------------------
-#  Version : v0.0.1
+#  Version : v0.0.2
 #  GitHub  : https://github.com/Mmd-Amir/Faoxima
 #  Telegram: https://t.me/faoxima
 # ----------------------------------------------------------------------------
@@ -16,7 +16,7 @@
 set -o pipefail
 
 # ─── METADATA ──────────────────────────────────────────────────────────────
-readonly FAOXIMA_VERSION="v0.0.1"
+readonly FAOXIMA_VERSION="v0.0.2"
 readonly FAOXIMA_REPO="Mmd-Amir/Faoxima"
 readonly FAOXIMA_GITHUB="https://github.com/${FAOXIMA_REPO}"
 readonly FAOXIMA_TELEGRAM="https://t.me/faoxima"
@@ -3348,7 +3348,7 @@ process_arguments() {
                 if [ -n "$2" ]; then
                     install_bot "-v" "$2"
                 else
-                    ui_err "Please specify a version with -v (e.g. -v 0.0.1)"
+                    ui_err "Please specify a version with -v (e.g. -v 0.0.2)"
                     exit 1
                 fi
             fi
