@@ -10,10 +10,6 @@ if (!defined('FAOXIMA_SKIP_BOTAPI_ROUTER')) {
     define('FAOXIMA_SKIP_BOTAPI_ROUTER', true);
 }
 
-if (extension_loaded('zlib') && empty(ini_get('zlib.output_compression'))) {
-    @ini_set('zlib.output_compression', '1');
-}
-
 session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/lib/icons.php';

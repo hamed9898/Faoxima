@@ -18,6 +18,9 @@ register_shutdown_function(static function () {
 
     while (ob_get_level() > 0) { @ob_end_clean(); }
     if (!headers_sent()) {
+        @header_remove('Content-Encoding');
+        @header_remove('Content-Length');
+        @ini_set('zlib.output_compression', '0');
         http_response_code(500);
         header('Content-Type: text/html; charset=utf-8');
     }

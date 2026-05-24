@@ -49,11 +49,6 @@ if (isset($_SESSION["user"])) {
 }
 
 
-if (extension_loaded('zlib') && empty(ini_get('zlib.output_compression'))) {
-    @ini_set('zlib.output_compression', '1');
-}
-
-
 if (!function_exists('icon')) {
     $__iconsLib = __DIR__ . '/lib/icons.php';
     if (is_file($__iconsLib) && is_readable($__iconsLib)) {

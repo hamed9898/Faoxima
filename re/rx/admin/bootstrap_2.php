@@ -2479,8 +2479,6 @@ elseif ($text == "📝 تنظیم متن ربات" && $adminrulecheck['rule'] ==
     step('textrequestagent', $from_id);
 } elseif ($user['step'] == "premium_emoji_get_char" && $adminrulecheck['rule'] == "administrator") {
 
-
-    @error_log('[premium_emoji_get_char] handler entered, from_id=' . (int)$from_id);
     try {
         $rxPemRawText = is_string($text) ? trim($text) : '';
         $rxPemSticker = $update['message']['sticker'] ?? null;
@@ -2519,8 +2517,6 @@ elseif ($text == "📝 تنظیم متن ربات" && $adminrulecheck['rule'] ==
     }
 } elseif ($user['step'] == "premium_emoji_get_id" && $adminrulecheck['rule'] == "administrator") {
 
-
-    @error_log('[premium_emoji_get_id] handler entered, from_id=' . (int)$from_id);
     try {
         $rxPemBase = (string)($user['Processing_value'] ?? '');
         if ($rxPemBase === '') {
@@ -2601,8 +2597,6 @@ elseif ($text == "📝 تنظیم متن ربات" && $adminrulecheck['rule'] ==
         }
 
         if ($rxPemCid === '') {
-
-            @error_log('[premium_emoji_get_id] no id found; message=' . substr(json_encode($update['message'] ?? null), 0, 1500));
             $rxPemDiag = '';
             $rxPemSentText = is_string($text) ? trim($text) : '';
             $rxPemStkType = is_array($update['message']['sticker'] ?? null) ? ($update['message']['sticker']['type'] ?? '') : '';
@@ -2670,8 +2664,6 @@ elseif ($text == "📝 تنظیم متن ربات" && $adminrulecheck['rule'] ==
     }
 } elseif ($user['step'] == "premium_emoji_edit_id" && $adminrulecheck['rule'] == "administrator") {
 
-
-    @error_log('[premium_emoji_edit_id] handler entered, from_id=' . (int)$from_id);
     try {
     $rxPemEmojiChar = (string)($user['Processing_value'] ?? '');
     if ($rxPemEmojiChar === '') {
