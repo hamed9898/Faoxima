@@ -69,16 +69,6 @@ final class PendingPaymentsHandler extends BaseHandler
 
     private function methodWindow(string $method, bool $iranian): int
     {
-        $m = strtolower(trim($method));
-        if (in_array($m, ['plisio', 'nowpayment', 'digitaltron'], true)) {
-            return 600;
-        }
-        if (in_array($m, ['cart to cart', 'carttocart_pv'], true)) {
-            return 1800;
-        }
-        if ($m === 'arze digital offline') {
-            return $iranian ? 7200 : 86400;
-        }
         return 1800;
     }
 

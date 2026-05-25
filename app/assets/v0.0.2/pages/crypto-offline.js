@@ -432,7 +432,7 @@ export function renderCryptoOffline(view, opts = {}) {
             subtitle: 'ربات هر ۱-۲ دقیقه یک‌بار شبکه را چک می‌کند. تا تایید شدن منتظر بمانید.',
             isCrypto: true,
             mode: watchMode,
-            timeoutSec: 600,
+            timeoutSec: 1800,
             pollEverySec: 5,
             onSuccess: async (statusObj) => {
 

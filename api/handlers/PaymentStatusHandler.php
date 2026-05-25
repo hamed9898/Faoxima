@@ -211,20 +211,6 @@ final class PaymentStatusHandler extends BaseHandler
 
     private function resolveTtl(array $report): int
     {
-        $method = strtolower(trim((string)($report['Payment_Method'] ?? '')));
-
-
-        if (in_array($method, ['plisio', 'nowpayment', 'digitaltron'], true)) {
-            return 600;
-        }
-
-
-        $iranian = (int)($report['crypto_iranian_mode'] ?? 0) === 1;
-        if (function_exists('crypto_pay_setting')) {
-            $key = $iranian ? 'cryptocheck_invoice_ttl_iranian' : 'cryptocheck_invoice_ttl';
-            $val = (int) crypto_pay_setting($key, $iranian ? '7200' : '86400');
-            if ($val >= 60) return $val;
-        }
-        return $iranian ? 7200 : 86400;
+        return 1800;
     }
 }

@@ -227,7 +227,7 @@ if (!function_exists('payment_mark_expired')) {
         if (!function_exists('telegram')) return true;
 
         $priceFmt = number_format((int)($report['price'] ?? 0));
-        $defaultText = "⏰ <b>پرداخت بعد از ۱۰ دقیقه تأیید نشد</b>\n\n"
+        $defaultText = "⏰ <b>پرداخت بعد از ۳۰ دقیقه تأیید نشد</b>\n\n"
                      . "🛒 کد فاکتور: <code>" . htmlspecialchars($orderId) . "</code>\n"
                      . "💸 مبلغ: <b>{$priceFmt}</b> تومان\n\n"
                      . "💡 اگر پرداخت کرده‌اید، ممکنه شبکه‌ی کریپتو هنوز confirm نکرده باشه. "

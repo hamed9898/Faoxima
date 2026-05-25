@@ -1884,8 +1884,8 @@ try {
         ['cryptocheck_amount_tolerance',  '0'],
         ['cryptocheck_overpay_tolerance', '0'],
         ['cryptocheck_max_retries',       '10'],
-        ['cryptocheck_invoice_ttl',       '86400'],
-        ['cryptocheck_invoice_ttl_iranian','7200'],
+        ['cryptocheck_invoice_ttl',       '1800'],
+        ['cryptocheck_invoice_ttl_iranian','1800'],
         ['cryptocheck_iranian_tolerance', '2'],
         ['cryptocheck_iranian_threshold', '1'],
     ];

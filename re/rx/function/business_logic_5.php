@@ -791,9 +791,7 @@ if (!function_exists('crypto_create_invoice')) {
             return ['ok' => false, 'error' => 'db-write-failed'];
         }
 
-        $ttlKey = $iranianMode ? 'cryptocheck_invoice_ttl_iranian' : 'cryptocheck_invoice_ttl';
-        $ttlDefault = $iranianMode ? '7200' : '86400';
-        $ttl = (int) crypto_pay_setting($ttlKey, $ttlDefault);
+        $ttl = 1800;
         return [
             'ok' => true,
             'order_id'    => $orderId,
@@ -803,7 +801,7 @@ if (!function_exists('crypto_create_invoice')) {
             'currency'    => $currency,
             'network'     => $network,
             'rate'        => $rate,
-            'expires_at'  => time() + max(60, $ttl),
+            'expires_at'  => time() + $ttl,
             'iranian_mode' => $iranianMode,
         ];
     }
