@@ -136,6 +136,15 @@ if (
         $rx_nav_targets[] = $rx_hardcoded_nav;
     }
 
+    if (is_string($__rx_code) && $__rx_code !== ''
+        && preg_match_all('/elseif\s*\(\s*\$text\s*==\s*"([^"]+)"\s*&&\s*\$adminrulecheck\[\'rule\'\]\s*==\s*"administrator"\s*\)/', $__rx_code, $rx_entry_matches)
+        && !empty($rx_entry_matches[1])) {
+        foreach ($rx_entry_matches[1] as $rx_entry_label) {
+            $rx_nav_targets[] = (string) $rx_entry_label;
+        }
+    }
+    $rx_nav_targets = array_values(array_unique($rx_nav_targets));
+
     if (!empty($rx_nav_targets) && in_array((string) $text, $rx_nav_targets, true)) {
         if (function_exists('step')) {
             try {
@@ -152,7 +161,7 @@ if (
         $user['step'] = 'home';
     }
 
-    unset($rx_nav_targets, $rx_nav_key, $rx_hardcoded_nav, $rx_step_err);
+    unset($rx_nav_targets, $rx_nav_key, $rx_hardcoded_nav, $rx_step_err, $rx_entry_matches, $rx_entry_label);
 }
 
 try {

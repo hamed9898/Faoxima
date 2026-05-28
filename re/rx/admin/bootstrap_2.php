@@ -4558,12 +4558,13 @@ $caption";
         return;
     }
     savedata("clear", "name_product", $text);
-    nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['setagentproduct'], $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['setagentproduct'], rx_agentGroupKeyboard(false), 'HTML');
     step('get_agent', $from_id);
 } elseif ($user['step'] == "get_agent") {
     $agent = ["n", "f", "n2"];
-    if (!in_array($text, $agent)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agent);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
     savedata("save", "agent", $text);

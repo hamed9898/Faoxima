@@ -1369,12 +1369,13 @@ $iduser  در ربات  رفع مسدود گردید
     step('getlimitcode', $from_id);
 } elseif ($user['step'] == "getlimitcode") {
     savedata("save", "limitDiscount", $text);
-    nm_adminInstantReply($from_id, $textbotlang['Admin']['Discount']['agentcode'], $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['Admin']['Discount']['agentcode'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypecodeagent', $from_id);
 } elseif ($user['step'] == "gettypecodeagent") {
     $agentst = ["n", "n2", "f", "allusers"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['Discount']['invalidagentcode'], $bakcadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['Discount']['invalidagentcode'], rx_agentGroupKeyboard(true), 'HTML');
         return;
     }
     savedata("save", "agent", $text);

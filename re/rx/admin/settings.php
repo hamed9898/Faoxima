@@ -1600,14 +1600,12 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         return;
     }
     savedata("clear", "price_cashback", $text);
-    nm_adminInstantReply($from_id, "📌 نوع کاربری را انتخاب نمایید
-f
-n
-n2", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 نوع کاربری را انتخاب نمایید", rx_agentGroupKeyboard(false), 'HTML');
     step('getagent', $from_id);
 } elseif ($user['step'] == "getagent") {
-    if (!in_array($text, ['f', 'n', 'n2'])) {
-        nm_adminInstantReply($from_id, "❌ گروه کاربری نامعتبر است", $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, ['f', 'n', 'n2']);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, "❌ گروه کاربری نامعتبر است", rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
@@ -2831,12 +2829,13 @@ n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "price", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'] . "\n" . "⚠️ در صورتی که می خواهید قیمت برای تمامی گروه های کاربری تنظیم شود متن <code>all</code> را ارسال کنید", $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextra', $from_id);
 } elseif ($user['step'] == "gettypeextra") {
     $agentst = ["n", "n2", "f", "all"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(true), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
@@ -2875,12 +2874,13 @@ n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "price", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'] . "\n" . "⚠️ در صورتی که می خواهید قیمت برای تمامی گروه های کاربری تنظیم شود متن <code>all</code> را ارسال کنید", $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextracustom', $from_id);
 } elseif ($user['step'] == "gettypeextracustom") {
     $agentst = ["n", "n2", "f", "all"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(true), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
@@ -2919,12 +2919,13 @@ n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "price", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'] . "\n" . "⚠️ در صورتی که می خواهید قیمت برای تمامی گروه های کاربری تنظیم شود متن <code>all</code> را ارسال کنید", $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextratime', $from_id);
 } elseif ($user['step'] == "gettypeextratime") {
     $agentst = ["n", "n2", "f", "all"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(true), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
@@ -2963,12 +2964,13 @@ n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "price", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'] . "\n" . "⚠️ در صورتی که می خواهید قیمت برای تمامی گروه های کاربری تنظیم شود متن <code>all</code> را ارسال کنید", $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextratimecustom', $from_id);
 } elseif ($user['step'] == "gettypeextratimecustom") {
     $agentst = ["n", "n2", "f", "all"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(true), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
@@ -3668,16 +3670,27 @@ f,n.n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "mainvalume", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramain', $from_id);
 } elseif ($user['step'] == "gettypeextramain") {
     $agentst = ["n", "n2", "f"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
+    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+        nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     $typepanel = select("marzban_panel", "*", "name_panel", $userdata['namepanel'], "select");
+    if (!is_array($typepanel)) {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب‌شده پیدا نشد. لطفاً دوباره پنل را انتخاب کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     outtypepanel($typepanel['type'], $textbotlang['Admin']['managepanel']['saveddata']);
     $eextraprice = json_decode($typepanel['mainvolume'], true);
     $eextraprice[$text] = $userdata['mainvalume'];
@@ -3695,16 +3708,27 @@ f,n.n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "maxvolume", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramax', $from_id);
 } elseif ($user['step'] == "gettypeextramax") {
     $agentst = ["n", "n2", "f"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
+    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+        nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     $typepanel = select("marzban_panel", "*", "name_panel", $userdata['namepanel'], "select");
+    if (!is_array($typepanel)) {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب‌شده پیدا نشد. لطفاً دوباره پنل را انتخاب کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     outtypepanel($typepanel['type'], $textbotlang['Admin']['managepanel']['saveddata']);
     $eextraprice = json_decode($typepanel['maxvolume'], true);
     $eextraprice[$text] = $userdata['maxvolume'];
@@ -3722,16 +3746,27 @@ f,n.n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "maintime", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramaintime', $from_id);
 } elseif ($user['step'] == "gettypeextramaintime") {
     $agentst = ["n", "n2", "f"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
+    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+        nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     $typepanel = select("marzban_panel", "*", "name_panel", $userdata['namepanel'], "select");
+    if (!is_array($typepanel)) {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب‌شده پیدا نشد. لطفاً دوباره پنل را انتخاب کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     outtypepanel($typepanel['type'], $textbotlang['Admin']['managepanel']['saveddata']);
     $eextraprice = json_decode($typepanel['maintime'], true);
     $eextraprice[$text] = $userdata['maintime'];
@@ -3749,16 +3784,27 @@ f,n.n2", $backadmin, 'HTML');
     }
     savedata("clear", "namepanel", $user['Processing_value']);
     savedata("save", "maxtime", $text);
-    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], $backuser, 'HTML');
+    nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramaxtime', $from_id);
 } elseif ($user['step'] == "gettypeextramaxtime") {
     $agentst = ["n", "n2", "f"];
-    if (!in_array($text, $agentst)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
+    $text = rx_resolveAgentGroup($text, $agentst);
+    if ($text === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
+    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+        nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     $typepanel = select("marzban_panel", "*", "name_panel", $userdata['namepanel'], "select");
+    if (!is_array($typepanel)) {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب‌شده پیدا نشد. لطفاً دوباره پنل را انتخاب کنید.", $backadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     outtypepanel($typepanel['type'], $textbotlang['Admin']['managepanel']['saveddata']);
     $eextraprice = json_decode($typepanel['maxtime'], true);
     $eextraprice[$text] = $userdata['maxtime'];

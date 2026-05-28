@@ -30,7 +30,7 @@ if (!function_exists('rx_payment_retry_kb')) {
         $miniAppUrl = $host !== '' ? ('https://' . $host . '/app/') : '';
 
         $supportRow = function_exists('select')
-            ? select('setting', 'support_username', null, null, 'select')
+            ? select('setting', '*', null, null, 'select')
             : null;
         $supportHandle = '';
         if (is_array($supportRow) && !empty($supportRow['support_username'])) {

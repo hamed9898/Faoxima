@@ -380,6 +380,65 @@ function nm_replyOrEdit($chatId, $text, $keyboard = null, $parseMode = 'HTML')
     return false;
 }}
 
+if (!function_exists('rx_resolveAgentGroup')) {
+    function rx_resolveAgentGroup($raw, array $allowed)
+    {
+        $t = trim((string) $raw);
+        $stripped = preg_replace('/^(?:\s|\x{FE0E}|\x{FE0F}|\x{200D}|\p{So}|\p{Cf})+/u', '', $t);
+        $t = is_string($stripped) ? trim($stripped) : $t;
+        $low = strtolower($t);
+
+        $map = [
+            'f' => 'f', 'کاربر عادی' => 'f', 'عادی' => 'f',
+            'n' => 'n', 'نماینده عادی' => 'n',
+            'n2' => 'n2', 'نماینده پیشرفته' => 'n2', 'نماینده با قابلیت های بیشتر' => 'n2',
+        ];
+
+        $token = null;
+        if (isset($map[$low])) {
+            $token = $map[$low];
+        } elseif (isset($map[$t])) {
+            $token = $map[$t];
+        } else {
+            $allWords = ['all', 'allusers', 'همه', 'همه گروه‌ها', 'همه گروه ها', 'همه کاربران'];
+            if (in_array($low, $allWords, true) || in_array($t, $allWords, true)) {
+                if (in_array('all', $allowed, true)) {
+                    $token = 'all';
+                } elseif (in_array('allusers', $allowed, true)) {
+                    $token = 'allusers';
+                }
+            }
+        }
+
+        if ($token !== null && in_array($token, $allowed, true)) {
+            return $token;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('rx_agentGroupKeyboard')) {
+    function rx_agentGroupKeyboard($allowAll = false)
+    {
+        global $textbotlang;
+        $back = $textbotlang['Admin']['backmenu'] ?? '▶️ بازگشت به منوی قبل';
+
+        $rows = [
+            [['text' => '👤 کاربر عادی'], ['text' => '🤝 نماینده عادی']],
+            [['text' => '💎 نماینده پیشرفته']],
+        ];
+        if ($allowAll) {
+            $rows[1][] = ['text' => '📊 همه گروه‌ها'];
+        }
+        $rows[] = [['text' => $back]];
+
+        return json_encode([
+            'keyboard' => $rows,
+            'resize_keyboard' => true,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+}
+
 if (!function_exists('nm_adminInstantReply')) {
 
 
