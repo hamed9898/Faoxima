@@ -152,7 +152,7 @@ function guardNormalizeSubscriptionEntry(array $panelConfig, array $subscription
         $computedUrl = rtrim($baseUrl, '/') . '/' . rawurlencode($tag) . '/' . rawurlencode($accessKey);
     }
 
-    $finalUrl = $computedUrl !== '' ? $computedUrl : $normalizedExisting;
+    $finalUrl = $normalizedExisting !== '' ? $normalizedExisting : $computedUrl;
     if ($finalUrl !== '') {
         $subscription['subscription_url'] = $finalUrl;
         $subscription['subscription'] = $finalUrl;
@@ -573,7 +573,8 @@ function guardGetSubscription($namePanel, string $username)
     if ($config['status'] === false) {
         return $config;
     }
-    $response = guardApiRequest($config, 'GET', "/api/subscriptions/{$username}");
+    $encodedUsername = urlencode($username);
+    $response = guardApiRequest($config, 'GET', "/api/subscriptions/{$encodedUsername}");
     $decoded = guardDecodeResponse($response);
     if ($decoded['status'] === false) {
         return $decoded;
@@ -589,7 +590,8 @@ function guardGetSubscriptionUsages($namePanel, string $username)
     if ($config['status'] === false) {
         return $config;
     }
-    $response = guardApiRequest($config, 'GET', "/api/subscriptions/{$username}/usages");
+    $encodedUsername = urlencode($username);
+    $response = guardApiRequest($config, 'GET', "/api/subscriptions/{$encodedUsername}/usages");
     return guardDecodeResponse($response);
 }
 

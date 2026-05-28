@@ -320,8 +320,8 @@ class ManagePanel
                     "limit_expire" => $limitExpire,
                     "service_ids" => $serviceResult['service_ids'],
                     "note" => $payloadNote,
-                    "telegram_id" => "",
-                    "discord_webhook_url" => "",
+                    "telegram_id" => null,
+                    "discord_webhook_url" => null,
                     "auto_delete_days" => $guardAutoDeleteDays,
                     "auto_renewals" => $guardAutoRenewalsPayload
                 )
@@ -707,14 +707,19 @@ class ManagePanel
                     'msg' => 'User not found'
                 );
             }
-            $statusGuard = isset($subscriptionData['status']) ? $subscriptionData['status'] : 'active';
-            if (isset($subscriptionData['enabled']) && $subscriptionData['enabled'] === false) {
+            $guardEnabled = array_key_exists('enabled', $subscriptionData)
+                ? filter_var($subscriptionData['enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                : null;
+            if (!empty($subscriptionData['expired'])) {
+                $statusGuard = "expired";
+            } elseif (!empty($subscriptionData['limited'])) {
+                $statusGuard = "limited";
+            } elseif ($guardEnabled === false) {
                 $statusGuard = "disabled";
-            }
-            if ($statusGuard === true) {
+            } elseif (isset($subscriptionData['status']) && is_string($subscriptionData['status']) && $subscriptionData['status'] !== '') {
+                $statusGuard = $subscriptionData['status'];
+            } else {
                 $statusGuard = "active";
-            } elseif ($statusGuard === false) {
-                $statusGuard = "disabled";
             }
             $limitExpire = isset($subscriptionData['limit_expire']) ? intval($subscriptionData['limit_expire']) : 0;
             $dataLimit = isset($subscriptionData['limit_usage']) ? intval($subscriptionData['limit_usage']) : 0;
