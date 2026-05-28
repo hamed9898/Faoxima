@@ -106,6 +106,17 @@ final class ServiceHandler extends BaseHandler
                 'type'  => 'password',
                 'value' => $remote['password'] ?? '',
             ];
+        } elseif ($type === 'guard') {
+            $guardSubUrl = $remote['subscription_url'] ?? '';
+            if ($guardSubUrl === '' && !empty($remote['links']) && is_array($remote['links'])) {
+                $guardSubUrl = (string)($remote['links'][0] ?? '');
+            }
+            if ($guardSubUrl !== '') {
+                $config[] = [
+                    'type'  => 'link',
+                    'value' => $guardSubUrl,
+                ];
+            }
         }
 
         $lastUpdate = null;

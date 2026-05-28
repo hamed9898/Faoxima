@@ -304,18 +304,15 @@ function faoxima_test_panel_auth(string $url, string $username, string $password
     if ($type === 'guard') {
         $key = $apiKey !== '' ? $apiKey : $password;
         if ($key === '') return ['ok' => true, 'verified' => false, 'message' => 'API key خالی است'];
-        $r = faoxima_http_post(
-            $url . '/api/v1/auth/login',
-            json_encode(['username' => $username !== '' ? $username : 'admin', 'password' => $key], JSON_UNESCAPED_UNICODE),
-            ['Content-Type: application/json', 'Accept: application/json']
+        $r = faoxima_http_get(
+            rtrim($url, '/') . '/api/admins/current',
+            ['Accept: application/json', 'X-API-Key: ' . $key]
         );
         if (!$r['ok']) return ['ok' => false, 'verified' => false, 'message' => 'اتصال ناموفق: ' . $r['error']];
         $j = json_decode($r['body'], true);
-        $haveToken = is_array($j) && (
-            (isset($j['access_token']) && $j['access_token'] !== '') ||
-            (isset($j['token'])        && $j['token']        !== '')
-        );
-        if ($haveToken) return ['ok' => true, 'verified' => true, 'message' => 'ورود موفق ✅'];
+        if ($r['code'] >= 200 && $r['code'] < 300 && is_array($j) && (isset($j['username']) || isset($j['id']))) {
+            return ['ok' => true, 'verified' => true, 'message' => 'اتصال موفق ✅'];
+        }
         if ($r['code'] === 429) {
             return ['ok' => true, 'verified' => false, 'message' => '⏱ سرور rate-limit کرده (429) — چند ثانیه صبر کنید و دوباره تست کنید'];
         }
