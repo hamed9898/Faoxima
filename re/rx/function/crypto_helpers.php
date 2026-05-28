@@ -106,6 +106,7 @@ if (!function_exists('crypto_check_ton_tx')) {
         $event = crypto_http_get_json('https://tonapi.io/v2/events/' . urlencode($hash), $headers);
         $eventActions = is_array($event) ? ($event['actions'] ?? []) : [];
         if (!is_array($eventActions)) $eventActions = [];
+        $tonTxTsSec = is_array($event) ? (int) ($event['timestamp'] ?? $event['utime'] ?? 0) : 0;
 
         $expectedHash = crypto_ton_address_hash($expectedTo);
         $diagDests = [];
@@ -137,7 +138,7 @@ if (!function_exists('crypto_check_ton_tx')) {
                         }
                     }
                     $sender = crypto_ton_extract_dest($tt['sender'] ?? null);
-                    return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amountTon, 'to' => $rcpt, 'via' => 'events', 'sender' => $sender]];
+                    return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amountTon, 'to' => $rcpt, 'via' => 'events', 'sender' => $sender, 'tx_timestamp' => $tonTxTsSec]];
                 }
             }
             if ($foundDestMatch) {
@@ -151,6 +152,9 @@ if (!function_exists('crypto_check_ton_tx')) {
                     return ['ok' => false, 'reason' => 'tx-not-found'];
                 }
                 return ['ok' => false, 'reason' => 'wrong-recipient', 'detail' => ['want' => $expectedTo, 'seen' => $diagDests]];
+            }
+            if ($tonTxTsSec === 0) {
+                $tonTxTsSec = (int) ($tx['utime'] ?? $tx['timestamp'] ?? 0);
             }
             if (!empty($tx['error'])) {
                 return ['ok' => false, 'reason' => 'tx-not-found', 'detail' => $tx];
@@ -185,7 +189,7 @@ if (!function_exists('crypto_check_ton_tx')) {
                         }
                     }
                     $sender = crypto_ton_extract_dest($msg['source'] ?? null);
-                    return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amountTon, 'to' => $dest, 'via' => 'tx', 'sender' => $sender]];
+                    return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amountTon, 'to' => $dest, 'via' => 'tx', 'sender' => $sender, 'tx_timestamp' => $tonTxTsSec]];
                 }
             }
             if ($foundDestMatch) {
@@ -226,7 +230,7 @@ if (!function_exists('crypto_check_ton_tx')) {
                     }
                 }
                 $sender = crypto_ton_extract_dest($jt['sender'] ?? null);
-                return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amount, 'to' => $recipient, 'sender' => $sender]];
+                return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amount, 'to' => $recipient, 'sender' => $sender, 'tx_timestamp' => $tonTxTsSec]];
             }
         }
         if ($foundDestMatch) {
@@ -251,8 +255,6 @@ if (!function_exists('crypto_check_payment')) {
         $expectedAmount = (float) ($row['crypto_amount'] ?? 0);
         if ($expectedAmount <= 0) return ['ok' => false, 'reason' => 'no-expected-amount'];
 
-        $iranianMode = !empty($row['crypto_iranian_mode']) && (int) $row['crypto_iranian_mode'] === 1;
-
         $usdtTrc20 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
         $usdtJettonMaster = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
 
@@ -265,10 +267,10 @@ if (!function_exists('crypto_check_payment')) {
         }
 
         switch ($currency) {
-            case 'TRX':        $verify = crypto_check_tron_tx($hash, $expectedTo, $expectedAmount, null, $iranianMode); break;
-            case 'USDT_TRC20': $verify = crypto_check_tron_tx($hash, $expectedTo, $expectedAmount, $usdtTrc20, $iranianMode); break;
-            case 'TON':        $verify = crypto_check_ton_tx($hash, $expectedTo, $expectedAmount, null, $iranianMode, $expectedMemo); break;
-            case 'USDT_TON':   $verify = crypto_check_ton_tx($hash, $expectedTo, $expectedAmount, $usdtJettonMaster, $iranianMode, $expectedMemo); break;
+            case 'TRX':        $verify = crypto_check_tron_tx($hash, $expectedTo, $expectedAmount, null, false); break;
+            case 'USDT_TRC20': $verify = crypto_check_tron_tx($hash, $expectedTo, $expectedAmount, $usdtTrc20, false); break;
+            case 'TON':        $verify = crypto_check_ton_tx($hash, $expectedTo, $expectedAmount, null, false, $expectedMemo); break;
+            case 'USDT_TON':   $verify = crypto_check_ton_tx($hash, $expectedTo, $expectedAmount, $usdtJettonMaster, false, $expectedMemo); break;
             default:           return ['ok' => false, 'reason' => 'unsupported-currency'];
         }
 

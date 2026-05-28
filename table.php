@@ -1871,6 +1871,47 @@ try {
         }
     } catch (Throwable $e) {  }
 
+    try {
+        $connect->query("CREATE TABLE IF NOT EXISTS crypto_verified_hashes (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            tx_hash VARCHAR(255) NOT NULL,
+            currency VARCHAR(20) NOT NULL,
+            network VARCHAR(20) NOT NULL,
+            wallet_to VARCHAR(255) NULL,
+            sender_address VARCHAR(255) NULL,
+            amount_coin DECIMAL(30,9) NULL,
+            amount_irr BIGINT NULL,
+            order_id VARCHAR(64) NOT NULL,
+            user_id VARCHAR(64) NULL,
+            verified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            verification_source VARCHAR(40) NOT NULL DEFAULT 'auto_cron',
+            UNIQUE KEY uniq_cvh_hash (tx_hash),
+            INDEX idx_cvh_order (order_id),
+            INDEX idx_cvh_user (user_id),
+            INDEX idx_cvh_currency (currency),
+            INDEX idx_cvh_verified_at (verified_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        error_log('[table.php] crypto_verified_hashes create: ' . $e->getMessage());
+    }
+
+    try {
+        $connect->query("CREATE TABLE IF NOT EXISTS crypto_sender_locks (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            sender_address VARCHAR(255) NOT NULL,
+            currency VARCHAR(20) NOT NULL,
+            telegram_user_id VARCHAR(64) NOT NULL,
+            first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_used_at TIMESTAMP NULL DEFAULT NULL,
+            use_count INT UNSIGNED NOT NULL DEFAULT 1,
+            UNIQUE KEY uniq_sender_currency (sender_address, currency),
+            INDEX idx_sender_user (telegram_user_id),
+            INDEX idx_sender_first_seen (first_seen_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        error_log('[table.php] crypto_sender_locks create: ' . $e->getMessage());
+    }
+
 
     $cryptoSettings = [
         ['cryptocheck_cashback_TRX',      '0'],

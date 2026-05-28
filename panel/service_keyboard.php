@@ -767,7 +767,6 @@ $MENUS = [
         'buttons' => [
             'currency_pick' => '💎 انتخاب ارز (TRX/TON/USDT)',
             'mode_external' => '🌍 کیف پول خارجی',
-            'mode_iranian'  => '🇮🇷 صرافی ایرانی',
             'copy_wallet'   => '🔗 کپی آدرس کیف پول',
             'copy_amount'   => '🪙 کپی مبلغ',
             'copy_memo'     => '🏷 کپی ممو',

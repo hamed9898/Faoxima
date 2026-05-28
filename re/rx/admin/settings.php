@@ -342,9 +342,49 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     $stmt->execute();
     nm_adminInstantReply($from_id, "✅ شماره کارت با موفقیت حذف گردید.", $CartManage, 'HTML');
     step("home", $from_id);
-} elseif (preg_match('/rejectrequesta_(\w+)/', $datain, $datagetr)) {
+} elseif (preg_match('/^rejectrequesta_(\w+)/', $datain, $datagetr)) {
+    // مرحله اول: فقط درخواست تایید از ادمین (جلوگیری از کلیک اشتباهی)
     $id_user = $datagetr[1];
-    $request_agent = select("Requestagent", "*", "id", $id_user, "select");
+    $request_agent = select("Requestagent", "*", "id", $id_user, "select", ['cache' => false]);
+    if (!$request_agent) {
+        telegram('answerCallbackQuery', array(
+            'callback_query_id' => $callback_query_id,
+            'text' => "درخواست مورد نظر یافت نشد.",
+            'show_alert' => true,
+            'cache_time' => 5,
+        ));
+        return;
+    }
+    if ($request_agent['status'] == "reject" || $request_agent['status'] == "accept") {
+        telegram('answerCallbackQuery', array(
+            'callback_query_id' => $callback_query_id,
+            'text' => "این درخواست توسط ادمین دیگری بررسی شده است",
+            'show_alert' => true,
+            'cache_time' => 5,
+        ));
+        return;
+    }
+    $confirmKeyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "✅ بله، رد کن", 'callback_data' => "cfmreja_" . $id_user],
+                ['text' => "🔙 لغو", 'callback_data' => "cnclagentreq_" . $id_user],
+            ],
+        ]
+    ], JSON_UNESCAPED_UNICODE);
+    $textConfirm = "📣 یک کاربر درخواست نمایندگی ثبت کرده لطفا اطلاعات را بررسی و وضعیت را مشخص کنید.\n\nآیدی عددی : $id_user\nنام کاربری : {$request_agent['username']}\nتوضیحات :  {$request_agent['Description']} ";
+    $textConfirm .= "\n\n⚠️ آیا از <b>رد</b> این درخواست اطمینان دارید؟";
+    Editmessagetext($from_id, $message_id, $textConfirm, $confirmKeyboard);
+    telegram('answerCallbackQuery', array(
+        'callback_query_id' => $callback_query_id,
+        'text' => "برای تایید نهایی روی «بله، رد کن» بزنید.",
+        'show_alert' => false,
+        'cache_time' => 1,
+    ));
+} elseif (preg_match('/^cfmreja_(\w+)/', $datain, $datagetr)) {
+    // مرحله دوم: اجرای واقعی رد درخواست پس از تایید ادمین
+    $id_user = $datagetr[1];
+    $request_agent = select("Requestagent", "*", "id", $id_user, "select", ['cache' => false]);
 
     if (!$request_agent) {
         telegram('answerCallbackQuery', array(
@@ -418,9 +458,90 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         'show_alert' => false,
         'cache_time' => 5,
     ));
-} elseif (preg_match('/addagentrequest_(\w+)/', $datain, $datagetr)) {
+} elseif (preg_match('/^addagentrequest_(\w+)/', $datain, $datagetr)) {
+    // مرحله اول: فقط درخواست تایید از ادمین (جلوگیری از کلیک اشتباهی)
     $id_user = $datagetr[1];
-    $request_agent = select("Requestagent", "*", "id", $id_user, "select");
+    $request_agent = select("Requestagent", "*", "id", $id_user, "select", ['cache' => false]);
+    if (!$request_agent) {
+        telegram('answerCallbackQuery', array(
+            'callback_query_id' => $callback_query_id,
+            'text' => "درخواست مورد نظر یافت نشد.",
+            'show_alert' => true,
+            'cache_time' => 5,
+        ));
+        return;
+    }
+    if ($request_agent['status'] == "reject" || $request_agent['status'] == "accept") {
+        telegram('answerCallbackQuery', array(
+            'callback_query_id' => $callback_query_id,
+            'text' => "این درخواست توسط ادمین دیگری بررسی شده است",
+            'show_alert' => true,
+            'cache_time' => 5,
+        ));
+        return;
+    }
+    $confirmKeyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "✅ بله، تایید کن", 'callback_data' => "cfmacea_" . $id_user],
+                ['text' => "🔙 لغو", 'callback_data' => "cnclagentreq_" . $id_user],
+            ],
+        ]
+    ], JSON_UNESCAPED_UNICODE);
+    $textConfirm = "📣 یک کاربر درخواست نمایندگی ثبت کرده لطفا اطلاعات را بررسی و وضعیت را مشخص کنید.\n\nآیدی عددی : $id_user\nنام کاربری : {$request_agent['username']}\nتوضیحات :  {$request_agent['Description']} ";
+    $textConfirm .= "\n\n⚠️ آیا از <b>تایید</b> این درخواست اطمینان دارید؟";
+    Editmessagetext($from_id, $message_id, $textConfirm, $confirmKeyboard);
+    telegram('answerCallbackQuery', array(
+        'callback_query_id' => $callback_query_id,
+        'text' => "برای تایید نهایی روی «بله، تایید کن» بزنید.",
+        'show_alert' => false,
+        'cache_time' => 1,
+    ));
+} elseif (preg_match('/^cnclagentreq_(\w+)/', $datain, $datagetr)) {
+    // لغو: بازگشت به حالت اولیه با دکمه‌های تایید/رد
+    $id_user = $datagetr[1];
+    $request_agent = select("Requestagent", "*", "id", $id_user, "select", ['cache' => false]);
+    if (!$request_agent) {
+        telegram('answerCallbackQuery', array(
+            'callback_query_id' => $callback_query_id,
+            'text' => "درخواست مورد نظر یافت نشد.",
+            'show_alert' => true,
+            'cache_time' => 5,
+        ));
+        return;
+    }
+    if ($request_agent['status'] == "reject" || $request_agent['status'] == "accept") {
+        telegram('answerCallbackQuery', array(
+            'callback_query_id' => $callback_query_id,
+            'text' => "این درخواست قبلاً بررسی شده است",
+            'show_alert' => true,
+            'cache_time' => 5,
+        ));
+        return;
+    }
+    $keyboardmanage = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => $textbotlang['users']['agenttext']['acceptrequest'], 'callback_data' => "addagentrequest_" . $id_user],
+                ['text' => $textbotlang['users']['agenttext']['rejectrequest'], 'callback_data' => "rejectrequesta_" . $id_user],
+            ],
+            [
+                ['text' => $textbotlang['users']['SendMessage'], 'callback_data' => 'Response_' . $id_user],
+            ],
+        ]
+    ], JSON_UNESCAPED_UNICODE);
+    $textrequestagent = "📣 یک کاربر درخواست نمایندگی ثبت کرده لطفا اطلاعات را بررسی و وضعیت را مشخص کنید.\n\nآیدی عددی : $id_user\nنام کاربری : {$request_agent['username']}\nتوضیحات :  {$request_agent['Description']} ";
+    Editmessagetext($from_id, $message_id, $textrequestagent, $keyboardmanage);
+    telegram('answerCallbackQuery', array(
+        'callback_query_id' => $callback_query_id,
+        'text' => "عملیات لغو شد.",
+        'show_alert' => false,
+        'cache_time' => 1,
+    ));
+} elseif (preg_match('/^cfmacea_(\w+)/', $datain, $datagetr)) {
+    // مرحله دوم: اجرای واقعی تایید درخواست پس از تایید ادمین
+    $id_user = $datagetr[1];
+    $request_agent = select("Requestagent", "*", "id", $id_user, "select", ['cache' => false]);
     if (!$request_agent) {
         telegram('answerCallbackQuery', array(
             'callback_query_id' => $callback_query_id,

@@ -66,7 +66,6 @@ export function renderCryptoOffline(view, opts = {}) {
         amount: Number(opts.amount || 0),
         purchaseUsername: opts.purchaseUsername || null,
         currency: null,
-        iranianMode: null,
         invoice: null,
         cleanup: null,
     };
@@ -157,53 +156,8 @@ export function renderCryptoOffline(view, opts = {}) {
                 hapticImpact('light');
                 const code = btn.dataset.code;
                 state.currency = currencies.find((c) => c.code === code) || null;
-                if (state.currency) step2Mode();
+                if (state.currency) step3Invoice();
             });
-        });
-    }
-
-
-    function step2Mode() {
-        view.innerHTML = `
-            <a href="#" class="page-back" id="crypto-back">
-                ${icon('chevronRight', 'class="ico"')}
-                <span>بازگشت</span>
-            </a>
-            <article class="card card-window">
-                <header class="card-window-bar">
-                    <span class="dots"><span></span><span></span><span></span></span>
-                    <span class="window-url">faoxima/crypto/mode</span>
-                </header>
-                <div class="card-body">
-                    <p class="section-title">${icon('settings')} حالت پرداخت</p>
-                    <h3 style="margin:4px 0 12px;font-size:17px">از کجا پرداخت می‌کنید؟</h3>
-                    <p class="muted" style="font-size:13px">انتخاب درست باعث می‌شود مبلغ روی شبکه دقیقاً با مبلغ فاکتور بخواند.</p>
-
-                    <button type="button" class="pay-card mt-md" id="mode-foreign">
-                        <span class="crypto-ico" style="color:#5a9fff">${icon('earth', 'class="ico ico-xl"')}</span>
-                        <span class="pay-label">کیف‌پول خارجی (Binance / Trust …)</span>
-                        <span class="muted" style="font-size:11px">اعشار دقیق — مثل ۵.۱۲۴۷</span>
-                        ${icon('chevronLeft', 'class="ico pay-arrow"')}
-                    </button>
-                    <button type="button" class="pay-card mt-sm" id="mode-iran">
-                        <span class="crypto-ico"><img src="${escapeHtml(((window.__APP_CONFIG__||{}).assetPrefix || '/') + 'assets/branding/coins/iran.svg')}" alt="IR" class="crypto-svg" style="width:30px;height:30px" /></span>
-                        <span class="pay-label">صرافی ایرانی (نوبیتکس / والکس …)</span>
-                        <span class="muted" style="font-size:11px">گرد شده — مثل ۵.۲ (تلورانس ~۲٪)</span>
-                        ${icon('chevronLeft', 'class="ico pay-arrow"')}
-                    </button>
-                </div>
-            </article>`;
-        setupBack(() => step1Currencies());
-
-        view.querySelector('#mode-foreign').addEventListener('click', () => {
-            hapticImpact('light');
-            state.iranianMode = false;
-            step3Invoice();
-        });
-        view.querySelector('#mode-iran').addEventListener('click', () => {
-            hapticImpact('light');
-            state.iranianMode = true;
-            step3Invoice();
         });
     }
 
@@ -225,13 +179,12 @@ export function renderCryptoOffline(view, opts = {}) {
                     <div class="skeleton skeleton-row"></div>
                 </div>
             </article>`;
-        setupBack(() => step2Mode());
+        setupBack(() => step1Currencies());
 
         try {
             const body = {
                 amount: state.amount,
                 currency_code: state.currency.code,
-                iranian_mode: state.iranianMode ? 1 : 0,
             };
             if (state.purchaseUsername) body.purchase_username = state.purchaseUsername;
             const res = await call('crypto_invoice_init', { method: 'POST', body });
@@ -250,7 +203,7 @@ export function renderCryptoOffline(view, opts = {}) {
                     <p class="muted">${escapeHtml(err.message || '')}</p>
                     <button class="btn btn-primary mt-md" id="retry-invoice">تلاش مجدد</button>
                 </div>`;
-            setupBack(() => step2Mode());
+            setupBack(() => step1Currencies());
             view.querySelector('#retry-invoice').addEventListener('click', () => step3Invoice());
         }
     }
@@ -280,7 +233,7 @@ export function renderCryptoOffline(view, opts = {}) {
                     <p class="section-title">${exchangeIcon('ico-accent')} پرداخت ارز آفلاین — ${escapeHtml(state.currency.name)}</p>
                     <p class="muted" style="font-size:13px">
                         مبلغ روبه‌رو را به آدرس زیر روی شبکه‌ی <b>${escapeHtml(inv.network)}</b> ارسال کنید.
-                        ${state.iranianMode ? 'حالت صرافی ایرانی: مبلغ گرد شده با تلورانس ~۲٪.' : 'حالت کیف‌پول خارجی: مبلغ دقیق با اعشار.'}
+                        مقدار دقیق رو با ۲ رقم اعشار از کیف‌پول یا صرافی ارسال کنید.
                     </p>
 
                     <div class="qr-panel mt-md">
@@ -331,7 +284,7 @@ export function renderCryptoOffline(view, opts = {}) {
                         body: { order_id: inv.order_id },
                     });
                 } catch (_) {  }
-                step2Mode();
+                step1Currencies();
             })();
         });
 

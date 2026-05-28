@@ -88,20 +88,21 @@ export async function home(view) {
         </div>
     `;
 
-    loadPendingBanner(view).catch(() => {});
+    const pendingCleanup = await loadPendingBanner(view).catch(() => () => {});
+    return () => { try { pendingCleanup && pendingCleanup(); } catch (_) {} };
 }
 
 
 async function loadPendingBanner(view) {
     const host = view.querySelector('#home-pending-host');
-    if (!host) return;
+    if (!host) return () => {};
 
     let pending = [];
     try {
         const res = await call('pending_payments');
         pending = Array.isArray(res?.obj?.pending) ? res.obj.pending : [];
-    } catch (_) { return; }
-    if (!pending.length) return;
+    } catch (_) { return () => {}; }
+    if (!pending.length) return () => {};
 
     host.innerHTML = pending.map(renderPendingCard).join('');
 
@@ -129,13 +130,42 @@ async function loadPendingBanner(view) {
             }
         });
     });
+
+    return startPendingTicker(host);
+}
+
+
+function fmtRemainMmSs(remainSec) {
+    const s = Math.max(0, Math.floor(remainSec));
+    if (s <= 0) return 'منقضی';
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    return (mm < 10 ? '0' + mm : '' + mm) + ':' + (ss < 10 ? '0' + ss : '' + ss);
+}
+
+
+function startPendingTicker(host) {
+    const nodes = host.querySelectorAll('.pending-remaining[data-expires-at]');
+    if (!nodes.length) return () => {};
+    function tick() {
+        const nowSec = Math.floor(Date.now() / 1000);
+        nodes.forEach((el) => {
+            const exp = Number(el.getAttribute('data-expires-at')) || 0;
+            if (exp <= 0) return;
+            el.textContent = fmtRemainMmSs(exp - nowSec);
+        });
+    }
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
 }
 
 
 function renderPendingCard(p) {
-    const min = Math.max(0, Math.floor((p.remaining_sec || 0) / 60));
-    const sec = Math.max(0, (p.remaining_sec || 0) % 60);
-    const remain = min > 0 ? min + ' دقیقه دیگر' : (sec > 0 ? sec + ' ثانیه دیگر' : 'منقضی');
+    const expiresAt = Number(p.expires_at) || 0;
+    const initialRemain = expiresAt > 0
+        ? fmtRemainMmSs(expiresAt - Math.floor(Date.now() / 1000))
+        : fmtRemainMmSs(p.remaining_sec || 0);
     const methodFa = methodLabel(p.method);
     const cur = p.currency_code ? ` (${escapeHtml(p.currency_code)})` : '';
     return `
@@ -147,7 +177,7 @@ function renderPendingCard(p) {
             <div class="pending-banner-grid">
                 <div><span class="muted">کد فاکتور</span><span class="mono">${escapeHtml(p.order_id)}</span></div>
                 <div><span class="muted">مبلغ</span><span class="mono accent">${escapeHtml(fmtPrice(p.amount))}</span></div>
-                <div><span class="muted">باقی‌مانده</span><span class="mono">${escapeHtml(remain)}</span></div>
+                <div><span class="muted">باقی‌مانده</span><span class="mono pending-remaining" data-expires-at="${expiresAt}">${escapeHtml(initialRemain)}</span></div>
             </div>
             <div class="pending-banner-actions">
                 <button type="button" class="btn btn-primary btn-block" data-resume="${escapeHtml(p.order_id)}">

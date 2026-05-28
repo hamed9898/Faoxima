@@ -14,7 +14,7 @@ foreach ($__rx_parts as $__rx_part) {
         throw new RuntimeException('Missing refactored part: ' . $__rx_path);
     }
     $__rx_raw = file_get_contents($__rx_path);
-    $__rx_raw = preg_replace('/^<\?php\n/', '', $__rx_raw, 1);
+    $__rx_raw = preg_replace('/^<\?php(\r\n|\r|\n)/', '', $__rx_raw, 1);
     $__rx_code .= $__rx_raw;
 }
 unset($__rx_parts, $__rx_part, $__rx_path, $__rx_raw);

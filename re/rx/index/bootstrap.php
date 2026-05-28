@@ -717,6 +717,7 @@ if ($user['joinchannel'] != "active") {
         $channels = channel($channels_id);
         if ($datain == "confirmchannel") {
             if (count($channels) == 0) {
+                update("user", "joinchannel", "active", "id", $from_id);
                 deletemessage($from_id, $message_id);
                 sendmessage($from_id, $datatextbot['text_start'], $keyboard, 'html');
                 telegram('answerCallbackQuery', [

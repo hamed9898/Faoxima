@@ -80,6 +80,19 @@ if (!function_exists('payment_confirm_paid')) {
             return ['ok' => false, 'reason' => 'report missing after update'];
         }
 
+        if (function_exists('crypto_record_verified_hash')) {
+            $methodLower = strtolower((string)($report['Payment_Method'] ?? ''));
+            if (in_array($methodLower, ['plisio', 'nowpayment', 'digitaltron', 'arze digital offline'], true)) {
+                $srcMap = [
+                    'plisio' => 'plisio_ipn',
+                    'nowpayment' => 'nowpayment_ipn',
+                    'digitaltron' => 'nowpayment_ipn',
+                    'arze digital offline' => 'manual_admin',
+                ];
+                crypto_record_verified_hash($orderId, $srcMap[$methodLower] ?? 'gateway_ipn');
+            }
+        }
+
         if (function_exists('DirectPayment')) {
             $imagePath = __DIR__ . '/../images.jpeg';
             if (!is_file($imagePath)) {

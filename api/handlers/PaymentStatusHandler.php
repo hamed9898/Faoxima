@@ -113,7 +113,6 @@ final class PaymentStatusHandler extends BaseHandler
             'currency_code'    => trim((string)($report['crypto_currency'] ?? '')) ?: null,
             'crypto_amount'    => trim((string)($report['crypto_amount']   ?? '')) ?: null,
             'wallet_to'        => trim((string)($report['crypto_wallet_to'] ?? '')) ?: null,
-            'iranian_mode'     => (int)($report['crypto_iranian_mode'] ?? 0) === 1,
         ];
 
         FaoximaResponse::ok($payload);

@@ -20,7 +20,7 @@ final class PendingPaymentsHandler extends BaseHandler
         try {
             $rows = FaoximaDb::fetchAll(
                 "SELECT id, id_order, time, price, payment_Status, Payment_Method,
-                        dec_not_confirmed, crypto_currency, crypto_iranian_mode
+                        dec_not_confirmed, crypto_currency, crypto_tx_hash
                    FROM Payment_report
                   WHERE id_user = :u
                     AND payment_Status IN ('Unpaid','waiting','AwaitingHash','pending')
@@ -46,7 +46,19 @@ final class PendingPaymentsHandler extends BaseHandler
             if ($createdAt === null) continue;
 
             $method = (string)$r['Payment_Method'];
-            $windowSec = $this->methodWindow($method, (int)($r['crypto_iranian_mode'] ?? 0) === 1);
+            $methodLc = strtolower($method);
+            $hashVal = trim((string)($r['crypto_tx_hash'] ?? ''));
+            $decVal = trim((string)($r['dec_not_confirmed'] ?? ''));
+
+            if ($methodLc === 'arze digital offline') {
+                if ($hashVal === '') continue;
+            } elseif (in_array($methodLc, ['cart to cart', 'carttocart_pv'], true)) {
+                if ($decVal === '') continue;
+            } elseif (in_array($methodLc, ['plisio', 'nowpayment', 'digitaltron'], true)) {
+                if ($decVal === '') continue;
+            }
+
+            $windowSec = $this->methodWindow($method, false);
             $expiresAt = $createdAt + $windowSec;
             if ($expiresAt < $now) continue;
 
@@ -59,7 +71,6 @@ final class PendingPaymentsHandler extends BaseHandler
                 'expires_at'    => $expiresAt,
                 'remaining_sec' => max(0, $expiresAt - $now),
                 'currency_code' => trim((string)($r['crypto_currency'] ?? '')) ?: null,
-                'iranian_mode'  => (int)($r['crypto_iranian_mode'] ?? 0) === 1,
             ];
         }
 

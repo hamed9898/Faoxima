@@ -2229,28 +2229,215 @@ $textonebuy
         sendmessage($from_id, "❌ درخواست بررسی مجدد لغو شد.", null, 'HTML');
     }
 } elseif ($datain == "recheckcrypto") {
-    update("user", "Processing_value", "0", "id", $from_id);
-    update("user", "Processing_value_one", "0", "id", $from_id);
-    update("user", "Processing_value_tow", "0", "id", $from_id);
-    update("user", "Processing_value_four", "0", "id", $from_id);
-    $rccMsg = "🔁 <b>بررسی مجدد هش کریپتو</b>\n\n"
-            . "اگر قبلاً پرداخت کریپتو انجام داده‌اید ولی فاکتورتان به‌صورت خودکار تایید نشده، می‌توانید از این بخش درخواست بررسی دستی ثبت کنید.\n\n"
-            . "ابتدا <b>ارز پرداختی</b> را انتخاب کنید:";
-    $rccKb = json_encode([
+    $rccListRows = [];
+    try {
+        $rccListStmt = $pdo->prepare(
+            "SELECT id_order, crypto_currency, crypto_amount, price, time
+               FROM Payment_report
+              WHERE id_user = :u
+                AND payment_Status = 'reject'
+                AND crypto_tx_hash IS NOT NULL
+                AND crypto_tx_hash <> ''
+              ORDER BY id DESC
+              LIMIT 10"
+        );
+        $rccListStmt->execute([':u' => (string) $from_id]);
+        $rccListRows = $rccListStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {  }
+
+    if (empty($rccListRows)) {
+        $rccEmptyMsg = "📭 <b>هیچ تراکنش رد شده‌ای ندارید</b>\n\n"
+            . "تراکنش‌های کریپتویی شما که توسط ربات رد شده باشن، در این بخش نمایش داده میشن.";
+        if ($message_id) {
+            Editmessagetext($from_id, $message_id, $rccEmptyMsg, null);
+        } else {
+            sendmessage($from_id, $rccEmptyMsg, null, 'HTML');
+        }
+        step('home', $from_id);
+        return;
+    }
+
+    $rccKbRows = [];
+    foreach ($rccListRows as $r) {
+        $rccLabel = '🪙 ' . (string) ($r['crypto_currency'] ?? '?')
+            . ' | ' . number_format((int) ($r['price'] ?? 0)) . ' ت'
+            . ' | ' . (string) ($r['id_order'] ?? '');
+        $rccKbRows[] = [
+            ['text' => $rccLabel, 'callback_data' => 'rcc_view_' . (string) ($r['id_order'] ?? '')],
+        ];
+    }
+    $rccKb = json_encode(['inline_keyboard' => $rccKbRows], JSON_UNESCAPED_UNICODE);
+    $rccListMsg = "🔁 <b>تراکنش‌های رد شده شما</b>\n\n"
+        . "روی هر تراکنش کلیک کنید تا جزئیاتش رو ببینید و در صورت لزوم برای بررسی دستی ادمین ارسال کنید.";
+    if ($message_id) {
+        Editmessagetext($from_id, $message_id, $rccListMsg, $rccKb);
+    } else {
+        sendmessage($from_id, $rccListMsg, $rccKb, 'HTML');
+    }
+    step('home', $from_id);
+} elseif (strpos((string) $datain, 'rcc_view_') === 0) {
+    $rccVOid = substr((string) $datain, strlen('rcc_view_'));
+    $rccVRow = null;
+    try {
+        $rccVStm = $pdo->prepare(
+            "SELECT * FROM Payment_report
+              WHERE id_order = :o AND id_user = :u AND payment_Status = 'reject'
+              LIMIT 1"
+        );
+        $rccVStm->execute([':o' => $rccVOid, ':u' => (string) $from_id]);
+        $rccVRow = $rccVStm->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) {  }
+
+    if (!is_array($rccVRow)) {
+        if ($callback_query_id && function_exists('telegram')) {
+            @telegram('answerCallbackQuery', [
+                'callback_query_id' => $callback_query_id,
+                'text' => '❌ یافت نشد یا قبلاً پردازش شده',
+                'show_alert' => true,
+            ]);
+        }
+        return;
+    }
+
+    $rccVExpUrl = function_exists('crypto_explorer_url')
+        ? crypto_explorer_url((string) ($rccVRow['crypto_currency'] ?? ''), (string) ($rccVRow['crypto_tx_hash'] ?? ''))
+        : (string) ($rccVRow['crypto_tx_hash'] ?? '');
+    $rccVReasonRaw = (string) ($rccVRow['crypto_last_error'] ?? ($rccVRow['dec_not_confirmed'] ?? ''));
+    $rccVReason = $rccVReasonRaw !== '' ? mb_substr($rccVReasonRaw, 0, 200) : '—';
+
+    $rccVText = "🧾 <b>جزئیات تراکنش رد شده</b>\n\n"
+        . "🛒 کد فاکتور: <code>" . htmlspecialchars($rccVOid) . "</code>\n"
+        . "💎 ارز: <b>" . htmlspecialchars((string) ($rccVRow['crypto_currency'] ?? '-')) . "</b>\n"
+        . "🪙 مقدار: <code>" . htmlspecialchars((string) ($rccVRow['crypto_amount'] ?? '-')) . "</code>\n"
+        . "💸 معادل تومانی: " . number_format((int) ($rccVRow['price'] ?? 0)) . " تومان\n"
+        . "🔗 هش: <code>" . htmlspecialchars((string) ($rccVRow['crypto_tx_hash'] ?? '-')) . "</code>\n"
+        . "📅 زمان: " . htmlspecialchars((string) ($rccVRow['time'] ?? '-')) . "\n"
+        . "📝 دلیل عدم تایید: " . htmlspecialchars($rccVReason) . "\n"
+        . "🔍 <a href=\"" . htmlspecialchars($rccVExpUrl, ENT_QUOTES) . "\">مشاهده در بلاکچین</a>";
+
+    $rccVKb = json_encode([
         'inline_keyboard' => [
-            [['text' => '🟥 ترون (TRX)',     'callback_data' => 'rcc_pick_TRX']],
-            [['text' => '🟦 تون (TON)',      'callback_data' => 'rcc_pick_TON']],
-            [['text' => '🟢 تتر روی ترون',    'callback_data' => 'rcc_pick_USDT_TRC20']],
-            [['text' => '🟢 تتر روی تون',     'callback_data' => 'rcc_pick_USDT_TON']],
-            [['text' => '❌ انصراف',          'callback_data' => 'rcc_cancel']],
+            [['text' => '📨 ارسال مجدد برای بررسی ادمین', 'callback_data' => 'rcc_resubmit_' . $rccVOid]],
+            [['text' => '🔙 بازگشت به لیست', 'callback_data' => 'recheckcrypto']],
         ],
     ], JSON_UNESCAPED_UNICODE);
     if ($message_id) {
-        Editmessagetext($from_id, $message_id, $rccMsg, $rccKb);
+        Editmessagetext($from_id, $message_id, $rccVText, $rccVKb);
     } else {
-        sendmessage($from_id, $rccMsg, $rccKb, 'HTML');
+        sendmessage($from_id, $rccVText, $rccVKb, 'HTML');
     }
-    step('home', $from_id);
+} elseif (strpos((string) $datain, 'rcc_resubmit_') === 0) {
+    $rccROid = substr((string) $datain, strlen('rcc_resubmit_'));
+    $rccRRow = null;
+    try {
+        $rccRStm = $pdo->prepare(
+            "SELECT * FROM Payment_report
+              WHERE id_order = :o AND id_user = :u AND payment_Status = 'reject'
+              LIMIT 1"
+        );
+        $rccRStm->execute([':o' => $rccROid, ':u' => (string) $from_id]);
+        $rccRRow = $rccRStm->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) {  }
+
+    if (!is_array($rccRRow)) {
+        if ($callback_query_id && function_exists('telegram')) {
+            @telegram('answerCallbackQuery', [
+                'callback_query_id' => $callback_query_id,
+                'text' => '❌ یافت نشد یا قبلاً پردازش شده',
+                'show_alert' => true,
+            ]);
+        }
+        return;
+    }
+
+    try {
+        $rccRUpd = $pdo->prepare(
+            "UPDATE Payment_report SET payment_Status = 'ManualPending', at_updated = :now
+              WHERE id_order = :o AND payment_Status = 'reject'"
+        );
+        $rccRUpd->execute([':now' => date('Y/m/d H:i:s'), ':o' => $rccROid]);
+        if ($rccRUpd->rowCount() < 1) {
+            if ($callback_query_id && function_exists('telegram')) {
+                @telegram('answerCallbackQuery', [
+                    'callback_query_id' => $callback_query_id,
+                    'text' => '❌ قبلاً ارسال شده',
+                    'show_alert' => true,
+                ]);
+            }
+            return;
+        }
+    } catch (Throwable $e) {
+        if ($callback_query_id && function_exists('telegram')) {
+            @telegram('answerCallbackQuery', [
+                'callback_query_id' => $callback_query_id,
+                'text' => '❌ خطای داخلی',
+                'show_alert' => true,
+            ]);
+        }
+        return;
+    }
+
+    $rccRExpUrl = function_exists('crypto_explorer_url')
+        ? crypto_explorer_url((string) ($rccRRow['crypto_currency'] ?? ''), (string) ($rccRRow['crypto_tx_hash'] ?? ''))
+        : (string) ($rccRRow['crypto_tx_hash'] ?? '');
+    $rccRUserTag = '@' . ($user['username'] ?? 'none');
+    $rccRReasonRaw = (string) ($rccRRow['crypto_last_error'] ?? ($rccRRow['dec_not_confirmed'] ?? ''));
+    $rccRReason = $rccRReasonRaw !== '' ? mb_substr($rccRReasonRaw, 0, 200) : '—';
+    $rccRAdminCaption = "🔁 <b>درخواست بررسی دستی توسط کاربر</b>\n\n"
+        . "🛒 کد فاکتور: <code>" . htmlspecialchars($rccROid) . "</code>\n"
+        . "👤 کاربر: <code>{$from_id}</code> ({$rccRUserTag})\n"
+        . "💎 ارز: <b>" . htmlspecialchars((string) ($rccRRow['crypto_currency'] ?? '-')) . "</b>\n"
+        . "🪙 مقدار: <code>" . htmlspecialchars((string) ($rccRRow['crypto_amount'] ?? '-')) . "</code>\n"
+        . "💸 معادل تومانی: " . number_format((int) ($rccRRow['price'] ?? 0)) . " تومان\n"
+        . "🔗 هش: <code>" . htmlspecialchars((string) ($rccRRow['crypto_tx_hash'] ?? '-')) . "</code>\n"
+        . "📝 دلیل اولیه رد: " . htmlspecialchars($rccRReason) . "\n"
+        . "🔍 <a href=\"" . htmlspecialchars($rccRExpUrl, ENT_QUOTES) . "\">مشاهده در بلاکچین</a>";
+
+    if (function_exists('crypto_lookup_verified_hash')) {
+        $rccRExisting = crypto_lookup_verified_hash((string) ($rccRRow['crypto_tx_hash'] ?? ''));
+        if (is_array($rccRExisting)) {
+            $rccRAdminCaption .= "\n\n⚠️ <b>هشدار: این هش قبلاً تایید شده</b>\n"
+                . "🛒 فاکتور قبلی: <code>" . htmlspecialchars((string) $rccRExisting['order_id']) . "</code>\n"
+                . "👤 کاربر قبلی: <code>" . htmlspecialchars((string) ($rccRExisting['user_id'] ?? '-')) . "</code>";
+        }
+    }
+
+    $rccRAdminKb = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => '✅ تایید خودکار', 'callback_data' => 'cmauto_' . $rccROid],
+                ['text' => '✏️ تایید دستی',   'callback_data' => 'cmmanual_' . $rccROid],
+            ],
+            [
+                ['text' => '🗑️ لغو و حذف از دیتابیس', 'callback_data' => 'cmdelete_' . $rccROid],
+            ],
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+
+    $rccRAdminIds = function_exists('select') ? (select('admin', 'id_admin', null, null, 'FETCH_COLUMN') ?: []) : [];
+    if (!is_array($rccRAdminIds)) {
+        $rccRAdminIds = [];
+    }
+    if (function_exists('telegram')) {
+        foreach ($rccRAdminIds as $rccRAdminOne) {
+            if (!is_numeric($rccRAdminOne)) continue;
+            @telegram('sendmessage', [
+                'chat_id' => (string)$rccRAdminOne,
+                'text' => $rccRAdminCaption,
+                'parse_mode' => 'HTML',
+                'reply_markup' => $rccRAdminKb,
+            ]);
+        }
+    }
+
+    $rccRUserMsg = "✅ <b>درخواست شما برای بررسی دستی ارسال شد</b>\n\n"
+        . "🛒 کد فاکتور: <code>" . htmlspecialchars($rccROid) . "</code>\n\n"
+        . "⏰ پس از بررسی توسط ادمین، نتیجه از طریق همین چت اعلام می‌شود.";
+    if ($message_id) {
+        Editmessagetext($from_id, $message_id, $rccRUserMsg, null);
+    } else {
+        sendmessage($from_id, $rccRUserMsg, null, 'HTML');
+    }
 } elseif (preg_match('/^rcc_pick_(TRX|TON|USDT_TRC20|USDT_TON)$/', (string) $datain, $rccPick)) {
     $rccCur = $rccPick[1];
     update("user", "Processing_value_one", $rccCur, "id", $from_id);
@@ -2394,6 +2581,15 @@ $textonebuy
         . "💸 معادل تومانی ادعاشده: " . number_format($rccIrr) . " تومان\n"
         . "🔗 هش: <code>{$rccHash}</code>\n"
         . "🔍 <a href=\"" . htmlspecialchars($explorerUrl, ENT_QUOTES) . "\">مشاهده در مرورگر بلاکچین</a>";
+    if (function_exists('crypto_lookup_verified_hash')) {
+        $rccExisting = crypto_lookup_verified_hash($rccHash);
+        if (is_array($rccExisting)) {
+            $rccAdminCaption .= "\n\n⚠️ <b>هشدار: این هش قبلاً تایید شده</b>\n"
+                . "🛒 فاکتور قبلی: <code>" . htmlspecialchars((string)$rccExisting['order_id']) . "</code>\n"
+                . "👤 کاربر قبلی: <code>" . htmlspecialchars((string)($rccExisting['user_id'] ?? '-')) . "</code>\n"
+                . "📅 تایید در: " . htmlspecialchars((string)($rccExisting['verified_at'] ?? '-'));
+        }
+    }
     $rccAdminKb = json_encode([
         'inline_keyboard' => [
             [
@@ -3405,43 +3601,9 @@ $textonebuy
              . "ℹ️ پس از پرداخت، فقط هش (Hash / TxID) تراکنش را برای ربات می‌فرستید — نیازی به ارسال عکس نیست. "
              . "هش هم به‌صورت خام و هم به‌صورت لینک (مثلاً <code>tonviewer.com/transaction/...</code> یا <code>tronscan.org/#/transaction/...</code>) قابل ارسال است.";
         sendmessage($from_id, $msg, $picker, 'HTML');
-    } elseif (preg_match('/^digitaltron_pay_(TRX|TON|USDT_TRC20|USDT_TON)$/', (string) $datain, $dpm)) {
+    } elseif (preg_match('/^digitaltron_(?:pay|paymode_(?:ext|ir))_(TRX|TON|USDT_TRC20|USDT_TON)$/', (string) $datain, $dpmm)) {
 
-        $cur = $dpm[1];
-        $faLabels = [
-            'TRX'        => 'ترون (TRX)',
-            'TON'        => 'تون (TON)',
-            'USDT_TRC20' => 'تتر روی ترون (USDT-TRC20)',
-            'USDT_TON'   => 'تتر روی تون (USDT-TON)',
-        ];
-        $curFa = $faLabels[$cur] ?? $cur;
-        $modeMsg = "💳 <b>روش پرداخت را انتخاب کنید</b>\n\n"
-                 . "ارز انتخابی: <b>{$curFa}</b>\n\n"
-                 . "🌍 <b>کیف پول خارجی:</b>\n"
-                 . "مبلغ با اعشار دقیق (مثلاً <code>0.129184</code>). مناسب کیف پول‌های شخصی مثل Tonkeeper / Trust Wallet.\n\n"
-                 . "🇮🇷 <b>صرافی ایرانی:</b>\n"
-                 . "مبلغ گرد به یک رقم اعشار (مثلاً <code>0.2</code>). مناسب برداشت از نوبیتکس و صرافی‌های ایرانی.";
-        $styleExt   = function_exists('crypto_invoice_button_style') ? crypto_invoice_button_style('mode_external') : null;
-        $styleIr    = function_exists('crypto_invoice_button_style') ? crypto_invoice_button_style('mode_iranian')  : null;
-        $styleBack2 = function_exists('crypto_invoice_button_style') ? crypto_invoice_button_style('invoice_back')  : null;
-        $btnExt  = ['text' => '🌍 کیف پول خارجی', 'callback_data' => 'digitaltron_paymode_ext_' . $cur];
-        $btnIr   = ['text' => '🇮🇷 صرافی ایرانی',   'callback_data' => 'digitaltron_paymode_ir_'  . $cur];
-        $btnBack = ['text' => '🔙 بازگشت',         'callback_data' => 'digitaltron'];
-        if ($styleExt)   $btnExt['style']  = $styleExt;
-        if ($styleIr)    $btnIr['style']   = $styleIr;
-        if ($styleBack2) $btnBack['style'] = $styleBack2;
-        $modeKb = json_encode([
-            'inline_keyboard' => [
-                [$btnExt],
-                [$btnIr],
-                [$btnBack],
-            ],
-        ], JSON_UNESCAPED_UNICODE);
-        sendmessage($from_id, $modeMsg, $modeKb, 'HTML');
-    } elseif (preg_match('/^digitaltron_paymode_(ext|ir)_(TRX|TON|USDT_TRC20|USDT_TON)$/', (string) $datain, $dpmm)) {
-
-        $iranianMode = ($dpmm[1] === 'ir');
-        $cur = $dpmm[2];
+        $cur = $dpmm[1];
         $amountIrt = (int) ($user['Processing_value'] ?? 0);
         if ($amountIrt <= 0) {
             sendmessage($from_id, "❌ مبلغ شارژ قابل تشخیص نیست. لطفاً مجدداً از منوی شارژ کیف پول اقدام کنید.", $keyboard, 'HTML');
@@ -3449,7 +3611,7 @@ $textonebuy
             return;
         }
         $invoiceMeta = sprintf('%s|%s', $user['Processing_value_tow'] ?? '', $user['Processing_value_one'] ?? '');
-        $result = crypto_create_invoice($from_id, $amountIrt, $cur, $invoiceMeta, $iranianMode);
+        $result = crypto_create_invoice($from_id, $amountIrt, $cur, $invoiceMeta);
         if (empty($result['ok'])) {
             $errMap = [
                 'currency-not-supported' => 'این ارز فعال نیست.',
@@ -3465,10 +3627,11 @@ $textonebuy
             step('home', $from_id);
             return;
         }
-        $supported = crypto_supported_currencies();
-        $coinDecimals = $supported[$cur]['decimals'];
-        $amountStr = number_format($result['amount_coin'], $coinDecimals, '.', '');
-        $amountStr = rtrim(rtrim($amountStr, '0'), '.');
+        $displayDecimals = function_exists('crypto_display_decimals') ? crypto_display_decimals($cur) : 2;
+        $amountStr = number_format((float) $result['amount_coin'], $displayDecimals, '.', '');
+        if (strpos($amountStr, '.') !== false) {
+            $amountStr = rtrim(rtrim($amountStr, '0'), '.');
+        }
         $expireMin = max(1, (int) round(($result['expires_at'] - time()) / 60));
         $explorerHint = ($cur === 'TRX' || $cur === 'USDT_TRC20')
             ? '<i>(لینک‌های Tronscan قابل قبول است)</i>'
@@ -3476,14 +3639,8 @@ $textonebuy
         $walletEsc = htmlspecialchars((string) $result['wallet']);
         $walletMemo = trim((string) ($result['wallet_memo'] ?? ''));
         $isTonNetwork = in_array($cur, ['TON', 'USDT_TON'], true);
-        $modeLabel = $iranianMode ? '🇮🇷 صرافی ایرانی' : '🌍 کیف پول خارجی';
 
-        if ($iranianMode) {
-            $amountNotice = "💡 این مبلغ گرد به یک رقم اعشار شده تا از صرافی ایرانی قابل برداشت باشد.\n"
-                          . "❗️ مبلغ <b>{$amountStr}</b> را ارسال کنید (تلرانس کم پذیرفته می‌شود).";
-        } else {
-            $amountNotice = "❗️ <b>دقیقاً همین مقدار</b> را ارسال کنید (تا چند رقم اعشار). تفاوت در ارقام اعشار باعث می‌شود ربات تراکنش شما را شناسایی نکند.";
-        }
+        $amountNotice = "❗️ <b>دقیقاً همین مقدار</b> را ارسال کنید. تفاوت در ارقام باعث می‌شود ربات تراکنش شما را شناسایی نکند.";
 
         $memoBlock = "";
         if ($isTonNetwork && $walletMemo !== '') {
@@ -3495,7 +3652,6 @@ $textonebuy
         $invoiceMsg = "💎 <b>فاکتور پرداخت کریپتو</b>\n\n"
              . "🛒 کد فاکتور: <code>{$result['order_id']}</code>\n"
              . "💎 ارز: <b>{$cur}</b>  •  🌐 شبکه: <b>{$result['network']}</b>\n"
-             . "💳 روش: <b>{$modeLabel}</b>\n"
              . "💸 مبلغ تومانی: " . number_format($amountIrt) . " تومان\n\n"
              . "🪙 <b>مبلغ دقیقی که باید ارسال کنید:</b>\n<code>{$amountStr}</code>\n\n"
              . "📥 <b>آدرس کیف پول مقصد:</b>\n<blockquote>{$walletEsc}</blockquote>\n\n"

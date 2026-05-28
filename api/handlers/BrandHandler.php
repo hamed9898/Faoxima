@@ -53,14 +53,6 @@ final class BrandHandler extends BaseHandler
             }
         }
 
-
-        if ($logoUrl === '') {
-            $defaultLogo = __DIR__ . '/../../app/assets/branding/default_logo.jpg';
-            if (is_file($defaultLogo)) {
-                $logoUrl = 'assets/branding/default_logo.jpg?v=' . filemtime($defaultLogo);
-            }
-        }
-
         return [
             'name'     => $name,
             'mark'     => $mark,

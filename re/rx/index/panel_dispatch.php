@@ -1010,10 +1010,18 @@ $text_porsant
         sendmessage($from_id, sprintf($textbotlang['users']['agenttext']['insufficientbalanceagent'], $priceagent), $backuser, 'HTML');
         return;
     }
-    $countagentrequest = select("Requestagent", "*", "id", $from_id, "count");
-    if ($countagentrequest != 0) {
-        sendmessage($from_id, $textbotlang['users']['agenttext']['requestreport'], null, 'html');
-        return;
+    $existingAgentRequest = select("Requestagent", "*", "id", $from_id, "select", ['cache' => false]);
+    if ($existingAgentRequest) {
+        // فقط درخواستی که هنوز در حال بررسی (waiting) است مانع ثبت درخواست جدید می‌شود.
+        if ($existingAgentRequest['status'] == "waiting") {
+            sendmessage($from_id, $textbotlang['users']['agenttext']['requestreport'], null, 'html');
+            return;
+        }
+        // اگر درخواست قبلی رد شده بود، رکورد قدیمی پاک می‌شود تا کاربر بتواند مجدداً درخواست دهد.
+        if ($existingAgentRequest['status'] == "reject") {
+            $stmtDelOld = $pdo->prepare("DELETE FROM Requestagent WHERE id = :id AND status = 'reject'");
+            $stmtDelOld->execute([':id' => $from_id]);
+        }
     }
     if ($user['agent'] != "f") {
         sendmessage($from_id, $textbotlang['users']['agenttext']['isagent'], null, 'html');
@@ -1026,6 +1034,18 @@ $text_porsant
     }
     step("getagentrequest", $from_id);
 } elseif ($user['step'] == "getagentrequest" && $text) {
+    // اطمینان از نبود درخواست قدیمیِ رد/تاییدشده تا INSERT جدید با خطای کلید تکراری مواجه نشود.
+    $oldReq = select("Requestagent", "*", "id", $from_id, "select", ['cache' => false]);
+    if ($oldReq && $oldReq['status'] == "waiting") {
+        // اگر همزمان درخواست در حال بررسی ثبت شده، از ثبت دوباره جلوگیری می‌کنیم.
+        sendmessage($from_id, $textbotlang['users']['agenttext']['requestreport'], $keyboard, 'html');
+        step("home", $from_id);
+        return;
+    }
+    if ($oldReq) {
+        $stmtDelOld = $pdo->prepare("DELETE FROM Requestagent WHERE id = :id");
+        $stmtDelOld->execute([':id' => $from_id]);
+    }
     $balancelow = $user['Balance'] - $setting['agentreqprice'];
     update("user", "Balance", $balancelow, "id", $from_id);
     sendmessage($from_id, $textbotlang['users']['agenttext']['endrequest'], $keyboard, 'html');

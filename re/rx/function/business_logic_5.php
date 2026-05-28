@@ -420,6 +420,9 @@ if (!function_exists('cm_apply_payment')) {
             update('Payment_report', 'payment_Status', 'paid', 'id_order', $orderId);
             update('Payment_report', 'at_updated', date('Y/m/d H:i:s'), 'id_order', $orderId);
         }
+        if (function_exists('crypto_record_verified_hash')) {
+            crypto_record_verified_hash($orderId, 'manual_admin');
+        }
         $coinAmt = rtrim(rtrim(number_format((float) ($payment['crypto_amount'] ?? 0), 9, '.', ''), '0'), '.');
         $explorerUrl = function_exists('crypto_explorer_url')
             ? crypto_explorer_url((string) ($payment['crypto_currency'] ?? ''), (string) ($payment['crypto_tx_hash'] ?? ''))
@@ -565,7 +568,7 @@ if (!function_exists('crypto_display_decimals')) {
             'TRX'        => 2,
             'USDT_TRC20' => 2,
             'USDT_TON'   => 2,
-            'TON'        => 3,
+            'TON'        => 2,
         ];
         $cfg = crypto_pay_setting('cryptocheck_display_decimals_' . $currency, '');
         if ($cfg !== '' && ctype_digit($cfg)) {
@@ -580,118 +583,25 @@ if (!function_exists('crypto_unique_amount')) {
 
     function crypto_unique_amount(float $baseCoinAmount, string $currency, ?int $extraDecimalsOverride = null, bool $iranianMode = false): float
     {
-        $currencies = crypto_supported_currencies();
-        $decimals = $currencies[$currency]['decimals'] ?? 6;
-
-
-        $exchangeFriendlyRaw = strtolower((string) crypto_pay_setting('cryptocheck_exchange_friendly', 'on'));
-        $exchangeFriendly = !in_array($exchangeFriendlyRaw, ['off', '0', 'false', 'no'], true);
-
-        if ($exchangeFriendly && !$iranianMode) {
-
-            $displayDecimals = crypto_display_decimals($currency);
-            $scale = (int) pow(10, $displayDecimals);
-            $maxNoiseCfg = crypto_pay_setting('cryptocheck_max_cent_noise', '');
-            $maxNoise = ($maxNoiseCfg !== '' && ctype_digit($maxNoiseCfg)) ? (int) $maxNoiseCfg : 24;
-            $maxNoise = max(1, min($maxNoise, $scale - 1));
-
-            $baseUnits = (int) ceil($baseCoinAmount * $scale - 1e-9);
-            if ($baseUnits < 1) $baseUnits = 1;
-
-
-            $pdo = function_exists('getDatabaseConnection') ? getDatabaseConnection() : null;
-            $existing = [];
-            if ($pdo instanceof PDO) {
-                try {
-                    $stmt = $pdo->prepare(
-                        "SELECT crypto_amount FROM Payment_report
-                          WHERE crypto_currency = :c
-                            AND payment_Status IN ('Unpaid','AwaitingHash')
-                            AND crypto_amount IS NOT NULL
-                            AND (crypto_iranian_mode = 0 OR crypto_iranian_mode IS NULL)"
-                    );
-                    $stmt->execute([':c' => $currency]);
-                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $units = (int) round((float) $row['crypto_amount'] * $scale);
-                        $existing[$units] = true;
-                    }
-                } catch (Throwable $e) {  }
-            }
-
-
-            for ($attempt = 0; $attempt < 64; $attempt++) {
-                try { $rand = random_int(1, $maxNoise); }
-                catch (Throwable $e) { $rand = mt_rand(1, $maxNoise); }
-                $candidate = $baseUnits + $rand;
-                if (!isset($existing[$candidate])) {
-                    return $candidate / $scale;
-                }
-            }
-
-            $bump = $maxNoise + ((int) (microtime(true) * 1000) % max(1, $maxNoise)) + 1;
-            return ($baseUnits + $bump) / $scale;
-        }
-
-
-        if ($iranianMode) {
-            $iranianAdaptiveThreshold = (float) crypto_pay_setting('cryptocheck_iranian_threshold', '1');
-            if ($iranianAdaptiveThreshold <= 0) $iranianAdaptiveThreshold = 1.0;
-            if ($baseCoinAmount < $iranianAdaptiveThreshold) {
-                $scale = 100;
-                $preserve = 6;
-            } else {
-                $scale = 10;
-                $preserve = 6;
-            }
-        } else {
-            $perCurrencyDefault = [
-                'TRX'        => 2,
-                'USDT_TRC20' => 2,
-                'USDT_TON'   => 2,
-                'TON'        => 5,
-            ];
-            if ($extraDecimalsOverride !== null) {
-                $extra = (int) $extraDecimalsOverride;
-            } else {
-                $cfgKey = 'cryptocheck_extra_decimals_' . $currency;
-                $cfgVal = crypto_pay_setting($cfgKey, '');
-                $extra = $cfgVal !== '' && ctype_digit($cfgVal)
-                    ? (int) $cfgVal
-                    : ($perCurrencyDefault[$currency] ?? 2);
-            }
-            $extra = max(2, min($extra, $decimals - 1));
-            $scale = (int) pow(10, $decimals);
-            $preserve = (int) pow(10, $extra);
-        }
-
+        $displayDecimals = crypto_display_decimals($currency);
+        $scale = (int) pow(10, $displayDecimals);
+        $maxNoiseCfg = crypto_pay_setting('cryptocheck_max_cent_noise', '');
+        $maxNoise = ($maxNoiseCfg !== '' && ctype_digit($maxNoiseCfg)) ? (int) $maxNoiseCfg : 24;
+        $maxNoise = max(1, min($maxNoise, $scale - 1));
 
         $baseUnits = (int) ceil($baseCoinAmount * $scale - 1e-9);
         if ($baseUnits < 1) $baseUnits = 1;
-
-        if ($iranianMode) {
-            $baseHigh = $baseUnits;
-        } else {
-            $baseHigh = ((int) ceil($baseUnits / $preserve)) * $preserve;
-            if ($baseHigh < $baseUnits + 1) {
-                $baseHigh += $preserve;
-            }
-        }
-
 
         $pdo = function_exists('getDatabaseConnection') ? getDatabaseConnection() : null;
         $existing = [];
         if ($pdo instanceof PDO) {
             try {
-                $sql = "SELECT crypto_amount FROM Payment_report
-                         WHERE crypto_currency = :c
-                           AND payment_Status IN ('Unpaid','AwaitingHash')
-                           AND crypto_amount IS NOT NULL";
-                if ($iranianMode) {
-                    $sql .= " AND crypto_iranian_mode = 1";
-                } else {
-                    $sql .= " AND (crypto_iranian_mode = 0 OR crypto_iranian_mode IS NULL)";
-                }
-                $stmt = $pdo->prepare($sql);
+                $stmt = $pdo->prepare(
+                    "SELECT crypto_amount FROM Payment_report
+                      WHERE crypto_currency = :c
+                        AND payment_Status IN ('Unpaid','AwaitingHash')
+                        AND crypto_amount IS NOT NULL"
+                );
                 $stmt->execute([':c' => $currency]);
                 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     $units = (int) round((float) $row['crypto_amount'] * $scale);
@@ -700,34 +610,17 @@ if (!function_exists('crypto_unique_amount')) {
             } catch (Throwable $e) {  }
         }
 
-        $maxAttempts = $iranianMode ? 5 : 64;
-        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-            try {
-                $rand = random_int(1, $preserve - 1);
-            } catch (Throwable $e) {
-                $rand = mt_rand(1, $preserve - 1);
-            }
-            $candidateUnits = $baseHigh + $rand;
-            if (!isset($existing[$candidateUnits])) {
-                return $candidateUnits / $scale;
+        for ($attempt = 0; $attempt < 64; $attempt++) {
+            try { $rand = random_int(1, $maxNoise); }
+            catch (Throwable $e) { $rand = mt_rand(1, $maxNoise); }
+            $candidate = $baseUnits + $rand;
+            if (!isset($existing[$candidate])) {
+                return $candidate / $scale;
             }
         }
 
-        if ($iranianMode) {
-            for ($bump = 1; $bump <= 100; $bump++) {
-                for ($offset = 1; $offset < $preserve; $offset++) {
-                    $candidateUnits = $baseHigh + $bump * $preserve + $offset;
-                    if (!isset($existing[$candidateUnits])) {
-                        return $candidateUnits / $scale;
-                    }
-                }
-            }
-            $fallback = $baseHigh + 1000 + ((int) (microtime(true) * 1000) % 9) + 1;
-            return $fallback / $scale;
-        }
-
-        $fallback = $baseHigh + $preserve + ((int) (microtime(true) * 1000) % ($preserve - 1)) + 1;
-        return $fallback / $scale;
+        $bump = $maxNoise + ((int) (microtime(true) * 1000) % max(1, $maxNoise)) + 1;
+        return ($baseUnits + $bump) / $scale;
     }
 }
 
@@ -777,7 +670,7 @@ if (!function_exists('crypto_create_invoice')) {
             $userIdStr = (string) $userId;
             $amountIrtStr = (string) $amountIrt;
             $coinStr = number_format($finalCoin, $currencies[$currency]['decimals'], '.', '');
-            $iranianModeStr = $iranianMode ? '1' : '0';
+            $iranianModeStr = '0';
             $sourceStr = ($source !== null && $source !== '') ? $source : null;
             $stmt->bind_param(
                 'sssssssssssss',
@@ -802,8 +695,131 @@ if (!function_exists('crypto_create_invoice')) {
             'network'     => $network,
             'rate'        => $rate,
             'expires_at'  => time() + $ttl,
-            'iranian_mode' => $iranianMode,
         ];
+    }
+}
+
+if (!function_exists('crypto_check_tx_timestamp_after_invoice')) {
+    function crypto_check_tx_timestamp_after_invoice(int $txTimestamp, int $invoiceCreatedAt, int $toleranceSec = 120): bool
+    {
+        if ($txTimestamp <= 0 || $invoiceCreatedAt <= 0) return true;
+        return $txTimestamp >= ($invoiceCreatedAt - $toleranceSec);
+    }
+}
+
+if (!function_exists('crypto_check_sender_lock')) {
+    function crypto_check_sender_lock(string $senderAddress, string $currency, string $telegramUserId): array
+    {
+        $senderAddress = trim($senderAddress);
+        $currency = trim($currency);
+        $telegramUserId = trim($telegramUserId);
+        if ($senderAddress === '' || $currency === '' || $telegramUserId === '') {
+            return ['ok' => true, 'first_use' => false, 'locked_to' => null];
+        }
+        $pdo = function_exists('getDatabaseConnection') ? getDatabaseConnection() : null;
+        if (!($pdo instanceof PDO)) {
+            return ['ok' => true, 'first_use' => false, 'locked_to' => null];
+        }
+        try {
+            $q = $pdo->prepare(
+                "SELECT telegram_user_id FROM crypto_sender_locks
+                  WHERE sender_address = :s AND currency = :c
+                  LIMIT 1"
+            );
+            $q->execute([':s' => $senderAddress, ':c' => $currency]);
+            $row = $q->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                return ['ok' => true, 'first_use' => true, 'locked_to' => null];
+            }
+            $lockedTo = (string) ($row['telegram_user_id'] ?? '');
+            if ($lockedTo === $telegramUserId) {
+                return ['ok' => true, 'first_use' => false, 'locked_to' => $lockedTo];
+            }
+            return ['ok' => false, 'first_use' => false, 'locked_to' => $lockedTo];
+        } catch (Throwable $e) {
+            error_log('[crypto] check_sender_lock: ' . $e->getMessage());
+            return ['ok' => true, 'first_use' => false, 'locked_to' => null];
+        }
+    }
+}
+
+if (!function_exists('crypto_record_sender_lock')) {
+    function crypto_record_sender_lock(string $senderAddress, string $currency, string $telegramUserId): bool
+    {
+        $senderAddress = trim($senderAddress);
+        $currency = trim($currency);
+        $telegramUserId = trim($telegramUserId);
+        if ($senderAddress === '' || $currency === '' || $telegramUserId === '') return false;
+        $pdo = function_exists('getDatabaseConnection') ? getDatabaseConnection() : null;
+        if (!($pdo instanceof PDO)) return false;
+        try {
+            $ins = $pdo->prepare(
+                "INSERT INTO crypto_sender_locks (sender_address, currency, telegram_user_id, last_used_at, use_count)
+                 VALUES (:s, :c, :u, CURRENT_TIMESTAMP, 1)
+                 ON DUPLICATE KEY UPDATE
+                    last_used_at = CURRENT_TIMESTAMP,
+                    use_count = use_count + 1"
+            );
+            $ins->execute([':s' => $senderAddress, ':c' => $currency, ':u' => $telegramUserId]);
+            return true;
+        } catch (Throwable $e) {
+            error_log('[crypto] record_sender_lock: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('crypto_record_verified_hash')) {
+    function crypto_record_verified_hash(string $orderId, string $source = 'auto_cron'): bool
+    {
+        $pdo = function_exists('getDatabaseConnection') ? getDatabaseConnection() : null;
+        if (!($pdo instanceof PDO)) return false;
+        try {
+            $row = function_exists('select') ? select('Payment_report', '*', 'id_order', $orderId, 'select') : null;
+            if (!is_array($row)) return false;
+            $hash = trim((string)($row['crypto_tx_hash'] ?? ''));
+            if ($hash === '') return false;
+            $ins = $pdo->prepare(
+                "INSERT IGNORE INTO crypto_verified_hashes
+                 (tx_hash, currency, network, wallet_to, sender_address, amount_coin, amount_irr, order_id, user_id, verification_source)
+                 VALUES (:h, :c, :n, :w, :s, :ac, :ai, :o, :u, :src)"
+            );
+            $walletTo = (string)($row['crypto_wallet_to'] ?? '');
+            $senderAddr = (string)($row['crypto_sender_address'] ?? '');
+            $userIdStr = (string)($row['id_user'] ?? '');
+            $ins->execute([
+                ':h' => $hash,
+                ':c' => (string)($row['crypto_currency'] ?? ''),
+                ':n' => (string)($row['crypto_network'] ?? ''),
+                ':w' => $walletTo !== '' ? $walletTo : null,
+                ':s' => $senderAddr !== '' ? $senderAddr : null,
+                ':ac' => $row['crypto_amount'] ?? null,
+                ':ai' => (int)($row['price'] ?? 0),
+                ':o' => $orderId,
+                ':u' => $userIdStr !== '' ? $userIdStr : null,
+                ':src' => $source,
+            ]);
+            return $ins->rowCount() > 0;
+        } catch (Throwable $e) {
+            error_log('[crypto] record_verified_hash: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('crypto_lookup_verified_hash')) {
+    function crypto_lookup_verified_hash(string $hash): ?array
+    {
+        $pdo = function_exists('getDatabaseConnection') ? getDatabaseConnection() : null;
+        if (!($pdo instanceof PDO) || trim($hash) === '') return null;
+        try {
+            $q = $pdo->prepare("SELECT * FROM crypto_verified_hashes WHERE tx_hash = :h LIMIT 1");
+            $q->execute([':h' => trim($hash)]);
+            $row = $q->fetch(PDO::FETCH_ASSOC);
+            return is_array($row) ? $row : null;
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 }
 
@@ -886,13 +902,6 @@ if (!function_exists('crypto_amount_within_tolerance')) {
         $overPct = (float) crypto_pay_setting('cryptocheck_overpay_tolerance', '0');
         $overPct = max(0.0, min($overPct, 100.0));
 
-        if ($iranianMode) {
-            $iranianPct = (float) crypto_pay_setting('cryptocheck_iranian_tolerance', '2');
-            $iranianPct = max(0.0, min($iranianPct, 10.0));
-            $shortPct = max($shortPct, $iranianPct);
-            $overPct  = max($overPct,  $iranianPct);
-        }
-
         $shortTol = $expected * ($shortPct / 100.0);
         $overTol  = $expected * ($overPct / 100.0);
 
@@ -940,6 +949,9 @@ if (!function_exists('crypto_check_tron_tx')) {
             return ['ok' => false, 'reason' => 'tx-failed', 'detail' => $tx];
         }
 
+        $txTimestampMs = (int) ($tx['timestamp'] ?? 0);
+        $txTimestampSec = $txTimestampMs > 0 ? (int) floor($txTimestampMs / 1000) : 0;
+
         if ($tokenContract === null) {
             $contractType = (int) ($tx['contractType'] ?? 1);
             if ($contractType !== 1) {
@@ -955,7 +967,7 @@ if (!function_exists('crypto_check_tron_tx')) {
                 return ['ok' => false, 'reason' => 'amount-mismatch', 'detail' => ['observed' => $amountTrx, 'want' => $expectedAmount]];
             }
             $sender = trim((string) ($tx['ownerAddress'] ?? $tx['contractData']['owner_address'] ?? ''));
-            return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amountTrx, 'to' => $to, 'sender' => $sender]];
+            return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amountTrx, 'to' => $to, 'sender' => $sender, 'tx_timestamp' => $txTimestampSec]];
         }
 
 
@@ -984,7 +996,7 @@ if (!function_exists('crypto_check_tron_tx')) {
                 return ['ok' => false, 'reason' => 'amount-mismatch', 'detail' => ['observed' => $amount, 'want' => $expectedAmount]];
             }
             $sender = trim((string) ($t['from_address'] ?? $t['fromAddress'] ?? $tx['ownerAddress'] ?? ''));
-            return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amount, 'to' => $to, 'sender' => $sender]];
+            return ['ok' => true, 'reason' => 'verified', 'detail' => ['amount' => $amount, 'to' => $to, 'sender' => $sender, 'tx_timestamp' => $txTimestampSec]];
         }
         return ['ok' => false, 'reason' => 'no-matching-trc20-transfer'];
     }

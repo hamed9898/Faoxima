@@ -4890,10 +4890,10 @@ $caption";
         ]);
         return;
     }
-    if ($cmPayment['payment_Status'] == 'paid' || $cmPayment['payment_Status'] == 'reject') {
+    if ($cmPayment['payment_Status'] == 'paid') {
         telegram('answerCallbackQuery', [
             'callback_query_id' => $callback_query_id,
-            'text' => 'این درخواست قبلاً بررسی شده است.',
+            'text' => 'این فاکتور قبلاً تایید شده است.',
             'show_alert' => true,
             'cache_time' => 5,
         ]);
@@ -4925,8 +4925,12 @@ $caption";
 } elseif (preg_match('/^cmauto_(\w+)$/', (string) $datain, $cmAuto) && ($adminrulecheck['rule'] == "administrator" || $adminrulecheck['rule'] == "Seller")) {
     $cmOrderId = $cmAuto[1];
     $cmPayment = select("Payment_report", "*", "id_order", $cmOrderId, "select");
-    if (!$cmPayment || in_array($cmPayment['payment_Status'], ['paid', 'reject'], true)) {
-        telegram('answerCallbackQuery', ['callback_query_id' => $callback_query_id, 'text' => 'بررسی‌شده/یافت‌نشد', 'show_alert' => true]);
+    if (!$cmPayment) {
+        telegram('answerCallbackQuery', ['callback_query_id' => $callback_query_id, 'text' => 'فاکتور یافت نشد', 'show_alert' => true]);
+        return;
+    }
+    if ($cmPayment['payment_Status'] === 'paid') {
+        telegram('answerCallbackQuery', ['callback_query_id' => $callback_query_id, 'text' => 'این فاکتور قبلاً تایید شده', 'show_alert' => true]);
         return;
     }
     $cmFinalIrr = (int) ($cmPayment['price'] ?? 0);
@@ -4934,8 +4938,12 @@ $caption";
 } elseif (preg_match('/^cmmanual_(\w+)$/', (string) $datain, $cmMan) && ($adminrulecheck['rule'] == "administrator" || $adminrulecheck['rule'] == "Seller")) {
     $cmOrderId = $cmMan[1];
     $cmPayment = select("Payment_report", "*", "id_order", $cmOrderId, "select");
-    if (!$cmPayment || in_array($cmPayment['payment_Status'], ['paid', 'reject'], true)) {
-        telegram('answerCallbackQuery', ['callback_query_id' => $callback_query_id, 'text' => 'بررسی‌شده/یافت‌نشد', 'show_alert' => true]);
+    if (!$cmPayment) {
+        telegram('answerCallbackQuery', ['callback_query_id' => $callback_query_id, 'text' => 'فاکتور یافت نشد', 'show_alert' => true]);
+        return;
+    }
+    if ($cmPayment['payment_Status'] === 'paid') {
+        telegram('answerCallbackQuery', ['callback_query_id' => $callback_query_id, 'text' => 'این فاکتور قبلاً تایید شده', 'show_alert' => true]);
         return;
     }
     update("user", "Processing_value_one", $cmOrderId, "id", $from_id);
@@ -4975,8 +4983,8 @@ $caption";
         step('home', $from_id);
         return;
     }
-    if (in_array($cmPayment['payment_Status'], ['paid', 'reject'], true)) {
-        nm_adminInstantReply($from_id, "❌ این درخواست قبلاً بررسی شده است.", $keyboardadmin, 'HTML');
+    if ($cmPayment['payment_Status'] === 'paid') {
+        nm_adminInstantReply($from_id, "❌ این فاکتور قبلاً تایید شده است.", $keyboardadmin, 'HTML');
         step('home', $from_id);
         return;
     }
@@ -5021,10 +5029,10 @@ $caption";
         ]);
         return;
     }
-    if ($cmPayment['payment_Status'] == 'paid' || $cmPayment['payment_Status'] == 'reject') {
+    if ($cmPayment['payment_Status'] === 'paid') {
         telegram('answerCallbackQuery', [
             'callback_query_id' => $callback_query_id,
-            'text' => 'این درخواست قبلاً بررسی شده است.',
+            'text' => 'این فاکتور قبلاً تایید شده است.',
             'show_alert' => true,
             'cache_time' => 5,
         ]);
@@ -5071,6 +5079,74 @@ $caption";
                 . "🛒 کد پیگیری: <code>{$cmOrderId}</code>\n"
                 . "👤 کاربر: <code>{$cmUserId}</code>\n"
                 . "📝 دلیل: " . htmlspecialchars($cmReason) . "\n"
+                . "👨‍💼 ادمین: <code>{$from_id}</code> (@{$username})",
+            'parse_mode' => 'HTML',
+        ]);
+    }
+} elseif (preg_match('/^cmdelete_(\w+)$/', (string) $datain, $cmDel) && ($adminrulecheck['rule'] == "administrator" || $adminrulecheck['rule'] == "Seller")) {
+    $cmdOrderId = $cmDel[1];
+    $cmdRow = select("Payment_report", "*", "id_order", $cmdOrderId, "select");
+    if (!$cmdRow) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => 'تراکنش یافت نشد یا قبلاً حذف شده',
+            'show_alert' => true,
+            'cache_time' => 5,
+        ]);
+        return;
+    }
+    if (($cmdRow['payment_Status'] ?? '') === 'paid') {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => 'این تراکنش قبلاً تایید شده — قابل حذف نیست.',
+            'show_alert' => true,
+            'cache_time' => 5,
+        ]);
+        return;
+    }
+    $cmdUserId = (string) ($cmdRow['id_user'] ?? '');
+    try {
+        $cmdDel = $pdo->prepare("DELETE FROM Payment_report WHERE id_order = :o");
+        $cmdDel->execute([':o' => $cmdOrderId]);
+    } catch (Throwable $e) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => 'خطا در حذف. لاگ را بررسی کنید.',
+            'show_alert' => true,
+            'cache_time' => 5,
+        ]);
+        error_log('[cmdelete] failed: ' . $e->getMessage());
+        return;
+    }
+    if ($cmdUserId !== '' && function_exists('sendmessage')) {
+        @sendmessage(
+            $cmdUserId,
+            "🗑️ <b>درخواست بررسی دستی شما لغو و حذف شد</b>\n\n"
+            . "🛒 کد فاکتور: <code>" . htmlspecialchars($cmdOrderId) . "</code>\n\n"
+            . "اگر سوال دارید، با پشتیبانی در ارتباط باشید.",
+            null,
+            'HTML'
+        );
+    }
+    telegram('answerCallbackQuery', [
+        'callback_query_id' => $callback_query_id,
+        'text' => '✅ حذف شد',
+        'cache_time' => 1,
+    ]);
+    if (!empty($message_id) && function_exists('Editmessagetext')) {
+        $cmdOriginal = (string) ($update['callback_query']['message']['text'] ?? '');
+        $cmdDoneNote = "\n\n━━━━━━━━━━━━\n🗑️ <b>لغو و حذف شده</b>\n"
+            . "👨‍💼 توسط ادمین: <code>" . htmlspecialchars((string) $from_id) . "</code>\n"
+            . "⏰ " . date('Y/m/d H:i:s');
+        @Editmessagetext($from_id, $message_id, $cmdOriginal . $cmdDoneNote, null);
+    }
+    if (strlen($setting['Channel_Report'] ?? '') > 0 && (string) $setting['Channel_Report'] !== (string) $from_id) {
+        @telegram('sendmessage', [
+            'chat_id' => $setting['Channel_Report'],
+            'message_thread_id' => $paymentreports,
+            'text' => "🗑️ <b>بررسی دستی پرداخت کریپتو لغو و حذف شد</b>\n\n"
+                . "🛒 کد پیگیری: <code>" . htmlspecialchars($cmdOrderId) . "</code>\n"
+                . "👤 کاربر: <code>" . htmlspecialchars($cmdUserId) . "</code>\n"
                 . "👨‍💼 ادمین: <code>{$from_id}</code> (@{$username})",
             'parse_mode' => 'HTML',
         ]);

@@ -11,7 +11,22 @@ function fmtMmSs(totalSec) {
 }
 
 
+function _gwGetActive() {
+    return (typeof window !== 'undefined') ? window.__faoximaGatewayWatchCleanup : null;
+}
+function _gwSetActive(fn) {
+    if (typeof window !== 'undefined') {
+        window.__faoximaGatewayWatchCleanup = (typeof fn === 'function') ? fn : null;
+    }
+}
+
+
 export function startGatewayWatch(view, opts) {
+    const _prevCleanup = _gwGetActive();
+    if (typeof _prevCleanup === 'function') {
+        try { _prevCleanup(); } catch (_) {}
+        _gwSetActive(null);
+    }
     const {
         orderId,
         title = 'در انتظار تایید پرداخت…',
@@ -88,7 +103,7 @@ export function startGatewayWatch(view, opts) {
 
                     <div class="watch-countdown mt-md" id="watch-countdown">
                         <span class="glyph">${icon('hourglass', 'class="ico"')}</span>
-                        <span class="mono" id="watch-time">${fmtMmSs(timeoutSec)}</span>
+                        <span class="mono" id="watch-time">${fmtMmSs(Math.max(0, Math.floor((deadline - Date.now()) / 1000)))}</span>
                         <span class="muted" style="font-size:12px">باقی‌مانده</span>
                     </div>
 
@@ -245,7 +260,10 @@ export function startGatewayWatch(view, opts) {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
         if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
         document.removeEventListener('visibilitychange', handleVisibility);
+        if (_gwGetActive() === cleanup) _gwSetActive(null);
     }
+
+    _gwSetActive(cleanup);
 
     html();
 

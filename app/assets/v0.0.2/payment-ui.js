@@ -240,18 +240,7 @@ export function wireCardToCard(view, d, opts = {}) {
 let _gatewayWatchModulePromise = null;
 function loadGatewayWatch() {
     if (_gatewayWatchModulePromise) return _gatewayWatchModulePromise;
-    const cfg = (typeof window !== 'undefined' && window.__APP_CONFIG__) || {};
-    const ver = (cfg.version || cfg.cacheBust || Date.now()).toString();
-    try {
-        const url = new URL('./pages/gateway-watch.js', import.meta.url);
-        url.searchParams.set('v', ver);
-        _gatewayWatchModulePromise = import(url.href).catch(() => {
-            _gatewayWatchModulePromise = null;
-            return import('./pages/gateway-watch.js');
-        });
-    } catch (e) {
-        _gatewayWatchModulePromise = import('./pages/gateway-watch.js');
-    }
+    _gatewayWatchModulePromise = import('./pages/gateway-watch.js');
     return _gatewayWatchModulePromise;
 }
 

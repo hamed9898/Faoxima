@@ -52,13 +52,11 @@ final class CryptoCurrenciesHandler extends BaseHandler
 
         $minRow = function_exists('crypto_pay_setting') ? (int) crypto_pay_setting('cryptocheck_min_irt', '0') : 0;
         $maxRow = function_exists('crypto_pay_setting') ? (int) crypto_pay_setting('cryptocheck_max_irt', '0') : 0;
-        $iranTol = function_exists('crypto_pay_setting') ? (float) crypto_pay_setting('cryptocheck_iranian_tolerance', '2') : 2.0;
 
         FaoximaResponse::ok([
             'currencies'           => $currencies,
             'min_amount_toman'     => $minRow,
             'max_amount_toman'     => $maxRow,
-            'iranian_tolerance_pct'=> $iranTol,
         ]);
     }
 }

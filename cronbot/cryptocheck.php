@@ -73,7 +73,7 @@ $expireBefore = date('Y/m/d H:i:s', time() - min($ttl, $ttlIranian));
 
 try {
     $expireStmt = $pdo->prepare(
-        "SELECT id_user, id_order, message_id, crypto_currency, time, crypto_iranian_mode
+        "SELECT id_user, id_order, message_id, crypto_currency, time
            FROM Payment_report
           WHERE payment_Status = 'Unpaid'
             AND crypto_currency IS NOT NULL
@@ -82,8 +82,7 @@ try {
     );
     $expireStmt->execute([':cutoff' => $expireBefore]);
     while ($row = $expireStmt->fetch(PDO::FETCH_ASSOC)) {
-        $rowIranian = !empty($row['crypto_iranian_mode']) && (int) $row['crypto_iranian_mode'] === 1;
-        $perRowTtl = $rowIranian ? $ttlIranian : $ttl;
+        $perRowTtl = $ttl;
         $rowTs = strtotime(str_replace('/', '-', (string) ($row['time'] ?? '')));
         if ($rowTs === false || $rowTs === 0 || $rowTs > time() - $perRowTtl) {
             continue;
@@ -380,7 +379,6 @@ foreach ($rows as $row) {
         'order'    => $orderId,
         'currency' => $currency,
         'hash'     => $hashShort,
-        'iranian'  => !empty($row['crypto_iranian_mode']) ? 1 : 0,
         'amount'   => $row['crypto_amount'] ?? null,
         'to'       => $row['crypto_wallet_to'] ?? null,
         'try'      => (int) ($row['crypto_check_count'] ?? 0) + 1,
@@ -397,6 +395,40 @@ foreach ($rows as $row) {
 
     $result = crypto_check_payment($row);
     $rxCryptoLog('INFO', 'verify result', ['order' => $orderId, 'result' => $result]);
+
+    if (is_array($result) && !empty($result['ok']) && function_exists('crypto_check_tx_timestamp_after_invoice')) {
+        $txTimestamp = isset($result['detail']['tx_timestamp']) ? (int) $result['detail']['tx_timestamp'] : 0;
+        $invoiceCreatedAtRaw = (string) ($row['time'] ?? '');
+        $invoiceCreatedAt = 0;
+        if ($invoiceCreatedAtRaw !== '') {
+            $tsParsed = strtotime(str_replace('/', '-', $invoiceCreatedAtRaw));
+            if ($tsParsed !== false) {
+                $invoiceCreatedAt = (int) $tsParsed;
+            }
+        }
+        if ($txTimestamp > 0 && $invoiceCreatedAt > 0) {
+            $toleranceSec = 120;
+            $earliestAllowed = $invoiceCreatedAt - $toleranceSec;
+            if ($txTimestamp < $earliestAllowed) {
+                $result = [
+                    'ok' => false,
+                    'reason' => 'tx-before-invoice',
+                    'detail' => [
+                        'tx_timestamp' => $txTimestamp,
+                        'invoice_created_at' => $invoiceCreatedAt,
+                        'diff_sec' => $invoiceCreatedAt - $txTimestamp,
+                    ],
+                ];
+                $rxCryptoLog('WARN', 'transaction predates invoice', [
+                    'order' => $orderId,
+                    'tx_timestamp' => $txTimestamp,
+                    'invoice_created_at' => $invoiceCreatedAt,
+                    'diff_sec' => $invoiceCreatedAt - $txTimestamp,
+                ]);
+            }
+        }
+    }
+
     if (!is_array($result) || empty($result['ok'])) {
         $reason = is_array($result) ? (string) ($result['reason'] ?? 'unknown') : 'no-result';
         try {
@@ -422,6 +454,8 @@ foreach ($rows as $row) {
             'sender-mismatch', 'sender-already-bound',
 
             'memo-mismatch',
+
+            'tx-before-invoice',
         ];
 
 
@@ -457,6 +491,7 @@ foreach ($rows as $row) {
                         'no-in-msg'            => 'تراکنش روی شبکه TON معتبر نیست.',
                         'sender-mismatch'      => 'آدرس فرستنده با آدرس ثبت‌شده‌ی فاکتور یکسان نیست. باید از همان کیف پول/صرافی قبلی ارسال کنید.',
                         'sender-already-bound' => 'این آدرس فرستنده قبلاً برای فاکتور دیگری استفاده شده است. لطفاً از کیف پول/حساب دیگری ارسال کنید.',
+                        'tx-before-invoice'    => 'این تراکنش قبل از ساخت فاکتور شما روی شبکه ثبت شده است. لطفاً پس از ساخت فاکتور پرداخت کنید و هش همان تراکنش را ارسال کنید.',
                         'memo-mismatch'        => 'ممو (Memo / Comment) تراکنش با مموی فاکتور یکسان نیست. لطفاً ممو دقیقاً همان‌طور که در فاکتور نشان داده شد را در پرداخت وارد کنید.',
                     ];
                     $faReason = $isTimeout
@@ -472,6 +507,50 @@ foreach ($rows as $row) {
                             null,
                             'HTML'
                         );
+                    }
+
+                    try {
+                        $explorerUrl = function_exists('crypto_explorer_url')
+                            ? crypto_explorer_url((string)($row['crypto_currency'] ?? ''), (string)($row['crypto_tx_hash'] ?? ''))
+                            : (string)($row['crypto_tx_hash'] ?? '');
+                        $dupWarn = '';
+                        if (function_exists('crypto_lookup_verified_hash')) {
+                            $existing = crypto_lookup_verified_hash((string)($row['crypto_tx_hash'] ?? ''));
+                            if (is_array($existing) && (string)($existing['order_id'] ?? '') !== $orderId) {
+                                $dupWarn = "\n\n⚠️ <b>این هش قبلاً تایید شده</b>\n"
+                                    . "🛒 فاکتور قبلی: <code>" . htmlspecialchars((string)$existing['order_id']) . "</code>\n"
+                                    . "👤 کاربر قبلی: <code>" . htmlspecialchars((string)($existing['user_id'] ?? '-')) . "</code>";
+                            }
+                        }
+                        $adminCaption = "❌ <b>هش کریپتو توسط ربات تایید نشد</b>\n\n"
+                            . "🛒 کد فاکتور: <code>{$orderId}</code>\n"
+                            . "👤 کاربر: <code>" . htmlspecialchars((string)($row['id_user'] ?? '-')) . "</code>\n"
+                            . "💎 ارز: " . htmlspecialchars((string)($row['crypto_currency'] ?? '-')) . "\n"
+                            . "🪙 مقدار ادعاشده: <code>" . htmlspecialchars((string)($row['crypto_amount'] ?? '-')) . "</code>\n"
+                            . "💸 معادل تومانی: " . number_format((int)($row['price'] ?? 0)) . " تومان\n"
+                            . "🔗 هش: <code>" . htmlspecialchars((string)($row['crypto_tx_hash'] ?? '-')) . "</code>\n"
+                            . "📝 دلیل عدم تایید: " . htmlspecialchars($faReason) . "\n"
+                            . "🔍 <a href=\"" . htmlspecialchars($explorerUrl, ENT_QUOTES) . "\">مشاهده در بلاکچین</a>"
+                            . $dupWarn
+                            . "\n\n💡 اگر کاربر درخواست بررسی دستی بده، اعلان جدید با دکمه‌های اقدام به پی‌وی شما ارسال می‌شود.";
+
+                        $settingsRow = function_exists('select') ? select('setting', '*') : [];
+                        $channelReport = is_array($settingsRow) ? (string)($settingsRow['Channel_Report'] ?? '') : '';
+                        $threadRow = function_exists('select') ? select('topicid', 'idreport', 'report', 'paymentreport', 'select') : null;
+                        $threadId = is_array($threadRow) ? (string)($threadRow['idreport'] ?? '') : '';
+                        if ($channelReport !== '' && function_exists('telegram')) {
+                            $payload = [
+                                'chat_id' => $channelReport,
+                                'text' => $adminCaption,
+                                'parse_mode' => 'HTML',
+                            ];
+                            if ($threadId !== '') {
+                                $payload['message_thread_id'] = $threadId;
+                            }
+                            @telegram('sendmessage', $payload);
+                        }
+                    } catch (Throwable $e) {
+                        $rxCryptoLog('ERROR', 'admin notify on reject failed', ['order' => $orderId, 'error' => $e->getMessage()]);
                     }
                 }
             } catch (Throwable $e) {  }
@@ -497,6 +576,9 @@ foreach ($rows as $row) {
         if ($atomic->rowCount() < 1) {
             $rxCryptoLog('WARN', 'mark-paid skipped (already paid?)', ['order' => $orderId]);
             continue;
+        }
+        if (function_exists('crypto_record_verified_hash')) {
+            crypto_record_verified_hash($orderId, 'auto_cron');
         }
         $rxCryptoLog('OK', 'invoice marked PAID', ['order' => $orderId, 'sender' => $verifiedSender]);
     } catch (Throwable $e) {

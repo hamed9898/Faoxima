@@ -48,10 +48,6 @@ $brandMark = 'M';
 $brandLogoUrl = '';
 
 
-$defaultLogoPath = __DIR__ . '/assets/branding/default_logo.jpg';
-if (is_file($defaultLogoPath)) {
-    $brandLogoUrl = $assetPrefix . 'assets/branding/default_logo.jpg?v=' . @filemtime($defaultLogoPath);
-}
 
 if (is_file(__DIR__ . '/../config.php') && is_file(__DIR__ . '/../function.php')) {
     @require_once __DIR__ . '/../config.php';

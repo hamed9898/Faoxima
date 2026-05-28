@@ -27,7 +27,6 @@ final class CryptoInvoiceInitHandler extends BaseHandler
 
         $amount       = FaoximaInput::int($this->data, 'amount', 0);
         $currency     = strtoupper(FaoximaInput::string($this->data, 'currency_code'));
-        $iranianMode  = (bool) FaoximaInput::int($this->data, 'iranian_mode', 0);
         $purchaseUser = FaoximaInput::nullableString($this->data, 'purchase_username');
 
         if ($amount <= 0) {
@@ -73,7 +72,7 @@ final class CryptoInvoiceInitHandler extends BaseHandler
                 $amount,
                 $currency,
                 $invoiceMeta,
-                $iranianMode,
+                false,
                 'miniapp'
             );
         } catch (Throwable $e) {
@@ -112,7 +111,6 @@ final class CryptoInvoiceInitHandler extends BaseHandler
             'amount_toman' => $amount,
             'rate'         => (float)($result['rate'] ?? 0),
             'expires_at'   => (int)($result['expires_at'] ?? 0),
-            'iranian_mode' => (bool)($result['iranian_mode'] ?? $iranianMode),
         ]);
     }
 }
