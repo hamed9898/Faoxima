@@ -23,9 +23,29 @@ if (function_exists('nmResolvePanelNameForUser')) {
         $rxResolvedPanelName = nmResolvePanelNameForUser($user);
         if ($rxResolvedPanelName !== '') {
             $rawProcessing = (string)($user['Processing_value'] ?? '');
-            if ($rawProcessing === '' || $rawProcessing[0] === '{' || $rawProcessing[0] === '[') {
+            $rxFlatten = ($rawProcessing === '');
+            if (!$rxFlatten && ($rawProcessing[0] === '{' || $rawProcessing[0] === '[')) {
+                // Only flatten a JSON state that is a BARE panel reference. If it
+                // carries ANY other key it is an in-progress multi-step flow state
+                // (custom volume/time/price, add-config, etc.) whose JSON must
+                // survive — otherwise the next step json_decode()s it, gets the
+                // scalar panel name back, and reports "اطلاعات مرحله قبلی ناقص".
+                $rxDecodedState = json_decode($rawProcessing, true);
+                $rxFlatten = true;
+                if (is_array($rxDecodedState)) {
+                    foreach ($rxDecodedState as $rxK => $rxV) {
+                        if (!in_array($rxK, ['namepanel', 'name_panel', 'panel', 'panel_name'], true)) {
+                            $rxFlatten = false;
+                            break;
+                        }
+                    }
+                }
+                unset($rxDecodedState, $rxK, $rxV);
+            }
+            if ($rxFlatten) {
                 $user['Processing_value'] = $rxResolvedPanelName;
             }
+            unset($rxFlatten);
         }
         unset($rxResolvedPanelName, $rawProcessing);
     }
@@ -1701,10 +1721,12 @@ n
 n2", $backadmin, 'HTML');
 } elseif ($user['step'] == "getagentbalancemin") {
     $agentst = ["n", "n2", "f", "allusers"];
-    if (!in_array($text, $agentst)) {
+    $grp = function_exists('rx_resolveAgentGroup') ? rx_resolveAgentGroup($text, $agentst) : (in_array($text, $agentst, true) ? $text : null);
+    if ($grp === null) {
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Discount']['invalidagentcode'], $bakcadmin, 'HTML');
         return;
     }
+    $text = $grp;
     step('home', $from_id);
     $balancemaax = json_decode(select("PaySetting", "ValuePay", "NamePay", "minbalance", "select")['ValuePay'], true);
     $balancemaax[$text] = $user['Processing_value'];
@@ -1729,10 +1751,12 @@ n
 n2", $backadmin, 'HTML');
 } elseif ($user['step'] == "getagentbalancemax") {
     $agentst = ["n", "n2", "f", "allusers"];
-    if (!in_array($text, $agentst)) {
+    $grp = function_exists('rx_resolveAgentGroup') ? rx_resolveAgentGroup($text, $agentst) : (in_array($text, $agentst, true) ? $text : null);
+    if ($grp === null) {
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Discount']['invalidagentcode'], $bakcadmin, 'HTML');
         return;
     }
+    $text = $grp;
     step('home', $from_id);
     $balancemaax = json_decode(select("PaySetting", "ValuePay", "NamePay", "maxbalance", "select")['ValuePay'], true);
     $balancemaax[$text] = $user['Processing_value'];
@@ -1766,10 +1790,12 @@ n2", $backadmin, 'HTML');
     step('gettypeagentoflist', $from_id);
 } elseif ($user['step'] == "gettypeagentoflist") {
     $agentst = ["n", "n2"];
-    if (!in_array($text, $agentst)) {
+    $grp = function_exists('rx_resolveAgentGroup') ? rx_resolveAgentGroup($text, $agentst) : (in_array($text, $agentst, true) ? $text : null);
+    if ($grp === null) {
         nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], $backadmin, 'HTML');
         return;
     }
+    $text = $grp;
     nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['useragented'], $keyboardadmin, 'HTML');
     update("user", "expire", null, "id", $user['Processing_value']);
     update("user", "agent", $text, "id", $user['Processing_value']);

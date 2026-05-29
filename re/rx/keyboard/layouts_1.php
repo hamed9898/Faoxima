@@ -236,40 +236,60 @@ if ($setting['inlinebtnmain'] == "oninline" && !empty($keyboardRows)) {
         }
     }
     if ($admin_idss != 0) {
-        $temp_addtional_key[] = ['text' => $textbotlang['Admin']['textpaneladmin'], 'callback_data' => "admin"];
+        $rx_lbl_admin = (string)($textbotlang['Admin']['textpaneladmin'] ?? '');
+        if (trim($rx_lbl_admin) !== '') {
+            $temp_addtional_key[] = ['text' => $rx_lbl_admin, 'callback_data' => "admin"];
+        }
     }
     if ($users['agent'] != "f") {
-        $temp_addtional_key[] = ['text' => $datatextbot['textpanelagent'], 'callback_data' => "agentpanel"];
+        $rx_lbl_agent = (string)($datatextbot['textpanelagent'] ?? '');
+        if (trim($rx_lbl_agent) !== '') {
+            $temp_addtional_key[] = ['text' => $rx_lbl_agent, 'callback_data' => "agentpanel"];
+        }
     }
     if ($users['agent'] == "f" && $setting['statusagentrequest'] == "onrequestagent") {
-        $temp_addtional_key[] = ['text' => $datatextbot['textrequestagent'], 'callback_data' => "requestagent"];
+        $rx_lbl_req = (string)($datatextbot['textrequestagent'] ?? '');
+        if (trim($rx_lbl_req) !== '') {
+            $temp_addtional_key[] = ['text' => $rx_lbl_req, 'callback_data' => "requestagent"];
+        }
     }
     $keyboard = ['inline_keyboard' => []];
     $keyboardcustom = $trace_keyboard;
     $keyboardcustom = json_decode(strtr(strval(json_encode($keyboardcustom)), $replacements), true);
-    $keyboardcustom[] = $temp_addtional_key;
+    if (!empty($temp_addtional_key)) $keyboardcustom[] = $temp_addtional_key;
     $keyboard['inline_keyboard'] = $keyboardcustom;
     $keyboard = function_exists('rx_finalizeInlineAdminKb')
         ? rx_finalizeInlineAdminKb(json_encode($keyboard))
         : json_encode($keyboard);
+    $keyboard = function_exists('rx_sanitizeKeyboardButtons') ? rx_sanitizeKeyboardButtons($keyboard) : $keyboard;
 } else {
     if ($admin_idss != 0) {
-        $temp_addtional_key[] = ['text' => $textbotlang['Admin']['textpaneladmin']];
+        $rx_lbl_admin = (string)($textbotlang['Admin']['textpaneladmin'] ?? '');
+        if (trim($rx_lbl_admin) !== '') {
+            $temp_addtional_key[] = ['text' => $rx_lbl_admin];
+        }
     }
     if ($users['agent'] != "f") {
-        $temp_addtional_key[] = ['text' => $datatextbot['textpanelagent']];
+        $rx_lbl_agent = (string)($datatextbot['textpanelagent'] ?? '');
+        if (trim($rx_lbl_agent) !== '') {
+            $temp_addtional_key[] = ['text' => $rx_lbl_agent];
+        }
     }
     if ($users['agent'] == "f" && $setting['statusagentrequest'] == "onrequestagent") {
-        $temp_addtional_key[] = ['text' => $datatextbot['textrequestagent']];
+        $rx_lbl_req = (string)($datatextbot['textrequestagent'] ?? '');
+        if (trim($rx_lbl_req) !== '') {
+            $temp_addtional_key[] = ['text' => $rx_lbl_req];
+        }
     }
     $keyboard = ['keyboard' => [], 'resize_keyboard' => true];
     $keyboardcustom = $keyboardRows;
     $keyboardcustom = json_decode(strtr(strval(json_encode($keyboardcustom)), $replacements), true);
-    $keyboardcustom[] = $temp_addtional_key;
+    if (!empty($temp_addtional_key)) $keyboardcustom[] = $temp_addtional_key;
     $keyboard['keyboard'] = $keyboardcustom;
     $keyboard = function_exists('rx_finalizeInlineAdminKb')
         ? rx_finalizeInlineAdminKb(json_encode($keyboard))
         : json_encode($keyboard);
+    $keyboard = function_exists('rx_sanitizeKeyboardButtons') ? rx_sanitizeKeyboardButtons($keyboard) : $keyboard;
 }
 
 $_rx_acc_styles  = [];

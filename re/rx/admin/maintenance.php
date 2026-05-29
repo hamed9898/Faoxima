@@ -1170,27 +1170,27 @@ if ($datain == "settimecornday" && $adminrulecheck['rule'] == "administrator") {
 ۳ - با تنظیم قیمت در این بخش قابل بازگشت نیست.
 
 
-جهت تنظیم قیمت ابتدا قیمت گروه f را ارسال نمایید.", $backadmin, 'HTML');
+جهت تنظیم قیمت، ابتدا «قیمت گروه کاربر عادی (f)» را به صورت عدد ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
     step("getpricef", $from_id);
 } elseif ($user['step'] == "getpricef") {
     if (!ctype_digit($text)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+        nm_adminInstantReply($from_id, "❌ لطفاً فقط «عدد» (مبلغ قیمت) ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
         return;
     }
     savedata("clear", "pricef", $text);
-    nm_adminInstantReply($from_id, "📌 قیمت گروه n را ارسال نمایید.", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 «قیمت گروه نماینده عادی (n)» را به صورت عدد ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
     step("getpricnn", $from_id);
 } elseif ($user['step'] == "getpricnn") {
     if (!ctype_digit($text)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+        nm_adminInstantReply($from_id, "❌ لطفاً فقط «عدد» (مبلغ قیمت) ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
         return;
     }
     savedata("save", "pricen", $text);
-    nm_adminInstantReply($from_id, "📌 قیمت گروه n2 را ارسال نمایید.", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 «قیمت گروه نماینده پیشرفته (n2)» را به صورت عدد ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
     step("getpricnn2", $from_id);
 } elseif ($user['step'] == "getpricnn2") {
     if (!ctype_digit($text)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+        nm_adminInstantReply($from_id, "❌ لطفاً فقط «عدد» (مبلغ قیمت) ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);
@@ -1209,27 +1209,27 @@ if ($datain == "settimecornday" && $adminrulecheck['rule'] == "administrator") {
 ۳ - با تنظیم قیمت در این بخش قابل بازگشت نیست.
 
 
-جهت تنظیم قیمت ابتدا قیمت گروه f را ارسال نمایید.", $backadmin, 'HTML');
+جهت تنظیم قیمت، ابتدا «قیمت گروه کاربر عادی (f)» را به صورت عدد ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
     step("getpriceftime", $from_id);
 } elseif ($user['step'] == "getpriceftime") {
     if (!ctype_digit($text)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+        nm_adminInstantReply($from_id, "❌ لطفاً فقط «عدد» (مبلغ قیمت) ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
         return;
     }
     savedata("clear", "pricef", $text);
-    nm_adminInstantReply($from_id, "📌 قیمت گروه n را ارسال نمایید.", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 «قیمت گروه نماینده عادی (n)» را به صورت عدد ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
     step("getpricnntime", $from_id);
 } elseif ($user['step'] == "getpricnntime") {
     if (!ctype_digit($text)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+        nm_adminInstantReply($from_id, "❌ لطفاً فقط «عدد» (مبلغ قیمت) ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
         return;
     }
     savedata("save", "pricen", $text);
-    nm_adminInstantReply($from_id, "📌 قیمت گروه n2 را ارسال نمایید.", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 «قیمت گروه نماینده پیشرفته (n2)» را به صورت عدد ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
     step("getpricnn2time", $from_id);
 } elseif ($user['step'] == "getpricnn2time") {
     if (!ctype_digit($text)) {
-        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidvlue'], $backadmin, 'HTML');
+        nm_adminInstantReply($from_id, "❌ لطفاً فقط «عدد» (مبلغ قیمت) ارسال کنید. (مثلاً: 5000)", $backadmin, 'HTML');
         return;
     }
     $userdata = json_decode($user['Processing_value'], true);

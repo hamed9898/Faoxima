@@ -1016,11 +1016,19 @@ try {
         }
 
         foreach ($insertQueries as $query) {
-            $connect->query("INSERT INTO textbot (id_text, text) VALUES ('$query[0]', '$query[1]')");
+            $idEsc   = $connect->real_escape_string($query[0]);
+            $textEsc = $connect->real_escape_string($query[1]);
+            $connect->query("INSERT INTO textbot (id_text, text) VALUES ('$idEsc', '$textEsc')");
         }
     } else {
         foreach ($insertQueries as $query) {
-            $connect->query("INSERT IGNORE INTO textbot (id_text, text) VALUES ('$query[0]', '$query[1]')");
+            $idEsc   = $connect->real_escape_string($query[0]);
+            $textEsc = $connect->real_escape_string($query[1]);
+            // Restore fully-missing rows...
+            $connect->query("INSERT IGNORE INTO textbot (id_text, text) VALUES ('$idEsc', '$textEsc')");
+            // ...and heal rows that exist but are blank/NULL (broken DB) without
+            // clobbering an admin's customised, non-empty text.
+            $connect->query("UPDATE textbot SET text = '$textEsc' WHERE id_text = '$idEsc' AND (text IS NULL OR text = '')");
         }
     }
 } catch (Exception $e) {

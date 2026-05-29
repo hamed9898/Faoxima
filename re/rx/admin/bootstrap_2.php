@@ -5320,10 +5320,12 @@ $caption";
 نوع کاربری ها :f , n , n2", $backadmin, 'HTML');
     step('change_type_agent', $from_id);
 } elseif ($user['step'] == "change_type_agent") {
-    if (!in_array($text, ['f', 'n', 'n2'])) {
+    $grp = function_exists('rx_resolveAgentGroup') ? rx_resolveAgentGroup($text, ['f', 'n', 'n2']) : (in_array($text, ['f', 'n', 'n2'], true) ? $text : null);
+    if ($grp === null) {
         nm_adminInstantReply($from_id, "❌ گروه کاربری نامعتبر می باشد", null, 'HTML');
         return;
     }
+    $text = $grp;
     $panel = select("marzban_panel", "*", "code_panel", $user['Processing_value_one'], "select");
     $stmt = $pdo->prepare("UPDATE product SET agent = :agents WHERE id = :name_product AND (Location = :Location OR Location = '/all') AND agent = :agent");
     $stmt->bindParam(':agents', $text);

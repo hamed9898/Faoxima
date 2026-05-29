@@ -104,9 +104,10 @@ $result = $stmt->fetchAll();
 $table_exists = count($result) > 0;
 $namepanel = [];
 if ($table_exists) {
-    $stmt = $pdo->prepare("SELECT * FROM marzban_panel");
+    $stmt = $pdo->prepare("SELECT * FROM marzban_panel WHERE name_panel IS NOT NULL AND name_panel <> ''");
     $stmt->execute();
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if (trim((string)$row['name_panel']) === '') continue; // skip corrupt/blank panel rows
         $namepanel[] = [$row['name_panel']];
     }
     $list_marzban_panel = [
@@ -124,10 +125,11 @@ if ($table_exists) {
     ];
     $json_list_marzban_panel = json_encode($list_marzban_panel);
 
-    $stmt = $pdo->prepare("SELECT * FROM marzban_panel");
+    $stmt = $pdo->prepare("SELECT * FROM marzban_panel WHERE name_panel IS NOT NULL AND name_panel <> ''");
     $stmt->execute();
     $list_marzban_panel_edit_product = ['inline_keyboard' => []];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if (trim((string)$row['name_panel']) === '') continue; // skip corrupt/blank panel rows
         $list_marzban_panel_edit_product['inline_keyboard'][] = [['text' =>$row['name_panel'],'callback_data' => 'locationedit_'.$row['code_panel']]];
     }
     $list_marzban_panel_edit_product['inline_keyboard'][] = [['text' =>"همه پنل ها",'callback_data' => 'locationedit_all']];

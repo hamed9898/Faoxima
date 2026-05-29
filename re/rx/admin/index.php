@@ -143,6 +143,46 @@ if (
             $rx_nav_targets[] = (string) $rx_entry_label;
         }
     }
+
+    // Enumerate every label from the admin keyboards that were actually rendered
+    // this request, so pressing ANY menu button (reply/non-glassy) while mid-step
+    // resets the step instead of the press being swallowed as step input. This is
+    // far more reliable than the regex above (which only catches handlers ending
+    // in `&& administrator`, missing many sub-menu reply buttons).
+    if (function_exists('rx_collectKeyboardLabels')) {
+        $rx_kb_vars = [
+            'keyboardadmin', 'setting_panel', 'shopkeyboard', 'keyboardhelpadmin',
+            'Feature_status', 'channelkeyboard', 'keyboard_Category_manage', 'keyboard_shop_manage',
+            'CartManage', 'trnado', 'keyboardzarinpal', 'keyboardzarinpey', 'aqayepardakht',
+            'NowPaymentsManage', 'nowpayment_setting_keyboard', 'Swapinokey', 'tronnowpayments',
+            'iranpaykeyboard', 'supportcenter', 'departemanslist', 'backadmin',
+        ];
+        $rx_kb_labels = [];
+        foreach ($rx_kb_vars as $rx_kb_var) {
+            $rx_kb_json = null;
+            if (isset($$rx_kb_var) && is_string($$rx_kb_var)) {
+                $rx_kb_json = $$rx_kb_var;
+            } elseif (isset($GLOBALS[$rx_kb_var]) && is_string($GLOBALS[$rx_kb_var])) {
+                $rx_kb_json = $GLOBALS[$rx_kb_var];
+            }
+            if ($rx_kb_json !== null && $rx_kb_json !== '') {
+                rx_collectKeyboardLabels($rx_kb_json, $rx_kb_labels);
+            }
+        }
+        foreach ($rx_kb_labels as $rx_kb_label) {
+            $rx_nav_targets[] = $rx_kb_label;
+            // Upstream strips the reply-style emoji prefix from $text before this
+            // guard runs, so add the stripped form too to guarantee a match.
+            if (function_exists('stripReplyStyleEmoji')) {
+                $rx_stripped_label = stripReplyStyleEmoji($rx_kb_label);
+                if ($rx_stripped_label !== '' && $rx_stripped_label !== $rx_kb_label) {
+                    $rx_nav_targets[] = $rx_stripped_label;
+                }
+            }
+        }
+        unset($rx_kb_vars, $rx_kb_var, $rx_kb_json, $rx_kb_labels, $rx_kb_label, $rx_stripped_label);
+    }
+
     $rx_nav_targets = array_values(array_unique($rx_nav_targets));
 
     if (!empty($rx_nav_targets) && in_array((string) $text, $rx_nav_targets, true)) {

@@ -47,6 +47,17 @@ function telegram($method, $datas = [], $token = null)
         }
     }
 
+    // Final safety net: strip any button with null/empty/non-string text from the
+    // outgoing keyboard so a single corrupt DB row (e.g. a marzban_panel row with
+    // name_panel = NULL feeding a dynamically-built list keyboard) can never make
+    // Telegram reject the whole message with "can't parse keyboard button: Field
+    // \"text\" must be of type String". Runs for ALL methods (even pre-transformed
+    // sends) and is premium-safe (keeps the ' ' icon-only buttons).
+    if (isset($datas['reply_markup']) && is_string($datas['reply_markup']) && $datas['reply_markup'] !== ''
+        && function_exists('rx_sanitizeKeyboardButtons')) {
+        $datas['reply_markup'] = rx_sanitizeKeyboardButtons($datas['reply_markup']);
+    }
+
     $preparedPayload = prepareTelegramRequestPayload($datas);
 
     // Outbound to api.telegram.org has intermittent 2-5s connect timeouts
@@ -397,6 +408,81 @@ if (!function_exists('rx_finalizeInlineAdminKb')) {
             if (!empty($newRow)) $newRows[] = $newRow;
         }
         return json_encode(['inline_keyboard' => $newRows], JSON_UNESCAPED_UNICODE);
+    }
+}
+
+if (!function_exists('rx_sanitizeKeyboardButtons')) {
+    /**
+     * Guarantee every keyboard button carries a non-empty string `text` so Telegram
+     * never rejects the markup with: Bad Request: can't parse keyboard button:
+     * Field "text" must be of type String.
+     * Button text coming from the DB/lang can be null/empty when a deployment's DB
+     * is broken; such buttons are dropped here (and emptied rows removed). Works for
+     * both reply (`keyboard`) and inline (`inline_keyboard`) markups and preserves
+     * the wrapper key plus any top-level flags (resize_keyboard, etc.).
+     */
+    function rx_sanitizeKeyboardButtons($json) {
+        if (!is_string($json) || $json === '') return $json;
+        $kb = json_decode($json, true);
+        if (!is_array($kb)) return $json;
+        $wrapperKey = null;
+        if (isset($kb['keyboard']) && is_array($kb['keyboard'])) {
+            $wrapperKey = 'keyboard';
+        } elseif (isset($kb['inline_keyboard']) && is_array($kb['inline_keyboard'])) {
+            $wrapperKey = 'inline_keyboard';
+        }
+        if ($wrapperKey === null) return $json;
+        $newRows = [];
+        foreach ($kb[$wrapperKey] as $row) {
+            if (!is_array($row)) continue;
+            $newRow = [];
+            foreach ($row as $btn) {
+                if (!is_array($btn)) continue;
+                // Drop only buttons Telegram would reject: missing / null / non-scalar /
+                // empty-string text. Keep a single space ' ' (used by premium icon-only
+                // buttons) and any other non-empty text as-is. Do NOT trim — a leading/
+                // trailing space can be intentional and is a valid string for Telegram.
+                if (!array_key_exists('text', $btn) || $btn['text'] === null) continue;
+                $t = $btn['text'];
+                if (!is_string($t)) {
+                    if (is_scalar($t)) { $t = (string)$t; } else { continue; }
+                }
+                if ($t === '') continue;
+                $btn['text'] = $t;
+                $newRow[] = $btn;
+            }
+            if (!empty($newRow)) $newRows[] = array_values($newRow);
+        }
+        $kb[$wrapperKey] = array_values($newRows);
+        return json_encode($kb, JSON_UNESCAPED_UNICODE);
+    }
+}
+
+if (!function_exists('rx_collectKeyboardLabels')) {
+    /**
+     * Collect every non-empty button label from a keyboard JSON string into $out.
+     * Used by the admin nav-guard to enumerate menu buttons so that pressing one
+     * mid-step resets the step instead of being swallowed as step input.
+     */
+    function rx_collectKeyboardLabels($json, array &$out) {
+        if (!is_string($json) || $json === '') return;
+        $kb = json_decode($json, true);
+        if (!is_array($kb)) return;
+        $rows = null;
+        if (isset($kb['keyboard']) && is_array($kb['keyboard'])) {
+            $rows = $kb['keyboard'];
+        } elseif (isset($kb['inline_keyboard']) && is_array($kb['inline_keyboard'])) {
+            $rows = $kb['inline_keyboard'];
+        }
+        if ($rows === null) return;
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            foreach ($row as $btn) {
+                if (!is_array($btn) || !isset($btn['text'])) continue;
+                $label = trim((string)$btn['text']);
+                if ($label !== '') $out[] = $label;
+            }
+        }
     }
 }
 

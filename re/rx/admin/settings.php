@@ -2710,9 +2710,15 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     }
 
 } elseif ($text == "➕ اضافه کردن کانفیگ") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
     nm_adminInstantReply($from_id, "📌 برای اضافه کردن کانفیگ ابتدا یک نام ارسال نمایید.", $backadmin, 'HTML');
     step('getnameconfigm', $from_id);
-    savedata("clear", "namepanel", $user['Processing_value']);
+    savedata("clear", "namepanel", $panelName);
 } elseif ($user['step'] == "getnameconfigm") {
     $exitsname = select("manualsell", "*", "namerecord", $text, "count");
     if (intval($exitsname) != 0) {
@@ -2820,6 +2826,12 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     update("marzban_panel", "priceChangeloc", $text, "name_panel", $user['Processing_value']);
     step('home', $from_id);
 } elseif ($text == "➕ قیمت حجم اضافه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 قیمت حجم اضافه برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('GetPriceExtra', $from_id);
 } elseif ($user['step'] == "GetPriceExtra") {
@@ -2827,7 +2839,13 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Balance']['Invalidprice'], $backadmin, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "price", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextra', $from_id);
@@ -2865,6 +2883,12 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     update("user", "Processing_value", $userdata['namepanel'], "id", $from_id);
     step('home', $from_id);
 } elseif ($text == "⚙️ قیمت حجم سرویس دلخواه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 قیمت حجم اضافه دلخواه این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('GetPricecustomvo', $from_id);
 } elseif ($user['step'] == "GetPricecustomvo") {
@@ -2872,7 +2896,13 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Balance']['Invalidprice'], $backadmin, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "price", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextracustom', $from_id);
@@ -2910,6 +2940,12 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     update("user", "Processing_value", $userdata['namepanel'], "id", $from_id);
     step('home', $from_id);
 } elseif ($text == "⏳ قیمت زمان اضافه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 قیمت زمان اضافه برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('GetPricetimeextra', $from_id);
 } elseif ($user['step'] == "GetPricetimeextra") {
@@ -2917,7 +2953,13 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Balance']['Invalidprice'], $backadmin, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "price", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextratime', $from_id);
@@ -2955,6 +2997,12 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     update("user", "Processing_value", $userdata['namepanel'], "id", $from_id);
     step('home', $from_id);
 } elseif ($text == "⏳ قیمت زمان دلخواه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 قیمت زمان دلخواه برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('GetPriceExtratime', $from_id);
 } elseif ($user['step'] == "GetPriceExtratime") {
@@ -2962,7 +3010,13 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Balance']['Invalidprice'], $backadmin, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "price", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(true), 'HTML');
     step('gettypeextratimecustom', $from_id);
@@ -3069,11 +3123,20 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
 در صورتی که  موقع تعریف محصول /all زدید  اگر میخواید این دسته تغییر قیمت داشته باشد حتما باید /all ارسال شود", $json_list_marzban_panel, 'HTML');
     step("getaddpricepeoductloc", $from_id);
 } elseif ($user['step'] == "getaddpricepeoductloc") {
-    nm_adminInstantReply($from_id, "📌 قیمت برای کدام گروه کاربری اعمال شود
-f,n.n2", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 قیمت برای کدام گروه کاربری اعمال شود؟
+یکی از گزینه‌های زیر را انتخاب یا ارسال کنید:
+👤 کاربر عادی (f)
+🤝 نماینده عادی (n)
+💎 نماینده پیشرفته (n2)", rx_agentGroupKeyboard(false), 'HTML');
     savedata("clear", "namepanel", $text);
     step("getagentaddpriceproduct", $from_id);
 } elseif ($user['step'] == "getagentaddpriceproduct") {
+    $grp = function_exists('rx_resolveAgentGroup') ? rx_resolveAgentGroup($text, ['f', 'n', 'n2']) : (in_array($text, ['f', 'n', 'n2'], true) ? $text : null);
+    if ($grp === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
+        return;
+    }
+    $text = $grp;
     $keyboard_type_price = json_encode([
         'inline_keyboard' => [
             [
@@ -3124,13 +3187,21 @@ f,n.n2", $backadmin, 'HTML');
 در صورتی که  موقع تعریف محصول /all زدید  اگر میخواید این دسته تغییر قیمت داشته باشد حتما باید /all ارسال شود", $json_list_marzban_panel, 'HTML');
     step("getlowpricepeoductloc", $from_id);
 } elseif ($user['step'] == "getlowpricepeoductloc") {
-    nm_adminInstantReply($from_id, "📌 قیمت برای کدام گروه کاربری اعمال شود
-f,n.n2", $backadmin, 'HTML');
+    nm_adminInstantReply($from_id, "📌 قیمت برای کدام گروه کاربری اعمال شود؟
+یکی از گزینه‌های زیر را انتخاب یا ارسال کنید:
+👤 کاربر عادی (f)
+🤝 نماینده عادی (n)
+💎 نماینده پیشرفته (n2)", rx_agentGroupKeyboard(false), 'HTML');
     savedata("clear", "namepanel", $text);
     step("getkampricepeoductloc", $from_id);
 } elseif ($user['step'] == "getkampricepeoductloc") {
+    $grp = function_exists('rx_resolveAgentGroup') ? rx_resolveAgentGroup($text, ['f', 'n', 'n2']) : (in_array($text, ['f', 'n', 'n2'], true) ? $text : null);
+    if ($grp === null) {
+        nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
+        return;
+    }
     nm_adminInstantReply($from_id, "📌 مبلغی که میخواهید اعمال شود را ارسال نمایید", $backadmin, 'HTML');
-    savedata("save", "agent", $text);
+    savedata("save", "agent", $grp);
     step("getkampricepeoduct", $from_id);
 } elseif ($user['step'] == "getkampricepeoduct") {
     if (!ctype_digit($text)) {
@@ -3661,6 +3732,12 @@ f,n.n2", $backadmin, 'HTML');
     step("home", $from_id);
     update("PaySetting", "ValuePay", $text, "NamePay", "maxbalanceiranpay");
 } elseif ($text == "📍 حداقل حجم دلخواه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 حداقل حجم که کاربر میتواند تهیه کند  برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('GetmaineExtra', $from_id);
 } elseif ($user['step'] == "GetmaineExtra") {
@@ -3668,7 +3745,13 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Product']['Invalidvolume'], $backuser, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "mainvalume", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramain', $from_id);
@@ -3679,8 +3762,8 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
-    $userdata = json_decode($user['Processing_value'], true);
-    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+    $userdata = json_decode($user['Processing_value'] ?? '{}', true);
+    if (!is_array($userdata) || empty($userdata['namepanel']) || !array_key_exists('mainvalume', $userdata)) {
         nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
         step('home', $from_id);
         return;
@@ -3699,6 +3782,12 @@ f,n.n2", $backadmin, 'HTML');
     update("user", "Processing_value", $userdata['namepanel'], "id", $from_id);
     step('home', $from_id);
 } elseif ($text == "📍 حداکثر حجم دلخواه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 حداکثر حجم که کاربر میتواند تهیه کند  برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('GetmaxeExtra', $from_id);
 } elseif ($user['step'] == "GetmaxeExtra") {
@@ -3706,7 +3795,13 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Product']['Invalidvolume'], $backuser, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "maxvolume", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramax', $from_id);
@@ -3717,8 +3812,8 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
-    $userdata = json_decode($user['Processing_value'], true);
-    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+    $userdata = json_decode($user['Processing_value'] ?? '{}', true);
+    if (!is_array($userdata) || empty($userdata['namepanel']) || !array_key_exists('maxvolume', $userdata)) {
         nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
         step('home', $from_id);
         return;
@@ -3737,6 +3832,12 @@ f,n.n2", $backadmin, 'HTML');
     update("user", "Processing_value", $userdata['namepanel'], "id", $from_id);
     step('home', $from_id);
 } elseif ($text == "📍 حداقل زمان دلخواه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 حداقل زمانی دلخواهی  که کاربر میتواند تهیه کند  برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('Getmaintime', $from_id);
 } elseif ($user['step'] == "Getmaintime") {
@@ -3744,7 +3845,13 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Product']['Invalidvolume'], $backuser, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "maintime", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramaintime', $from_id);
@@ -3755,8 +3862,8 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
-    $userdata = json_decode($user['Processing_value'], true);
-    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+    $userdata = json_decode($user['Processing_value'] ?? '{}', true);
+    if (!is_array($userdata) || empty($userdata['namepanel']) || !array_key_exists('maintime', $userdata)) {
         nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
         step('home', $from_id);
         return;
@@ -3775,6 +3882,12 @@ f,n.n2", $backadmin, 'HTML');
     update("user", "Processing_value", $userdata['namepanel'], "id", $from_id);
     step('home', $from_id);
 } elseif ($text == "📍 حداکثر زمان دلخواه" && $adminrulecheck['rule'] == "administrator") {
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. ابتدا از «مدیریت پنل» پنل موردنظر را باز کنید، سپس دوباره این دکمه را بزنید.", $keyboardadmin, 'HTML');
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     nm_adminInstantReply($from_id, "📌 حداکثر زمانی دلخواهی  که کاربر میتواند تهیه کند  برای این پنل را ارسال نمایید.", $backadmin, 'HTML');
     step('Getmaxtime', $from_id);
 } elseif ($user['step'] == "Getmaxtime") {
@@ -3782,7 +3895,13 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['Product']['Invalidvolume'], $backuser, 'HTML');
         return;
     }
-    savedata("clear", "namepanel", $user['Processing_value']);
+    $panelName = function_exists('nmResolvePanelNameForUser') ? nmResolvePanelNameForUser($user) : (string)$user['Processing_value'];
+    if ($panelName === '') {
+        nm_adminInstantReply($from_id, "❌ پنل انتخاب نشده است. لطفاً دوباره پنل را انتخاب کنید.", $keyboardadmin, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    savedata("clear", "namepanel", $panelName);
     savedata("save", "maxtime", $text);
     nm_adminInstantReply($from_id, $textbotlang['users']['Extra_volume']['gettypeextra'], rx_agentGroupKeyboard(false), 'HTML');
     step('gettypeextramaxtime', $from_id);
@@ -3793,8 +3912,8 @@ f,n.n2", $backadmin, 'HTML');
         nm_adminInstantReply($from_id, $textbotlang['Admin']['agent']['invalidtypeagent'], rx_agentGroupKeyboard(false), 'HTML');
         return;
     }
-    $userdata = json_decode($user['Processing_value'], true);
-    if (!is_array($userdata) || empty($userdata['namepanel'])) {
+    $userdata = json_decode($user['Processing_value'] ?? '{}', true);
+    if (!is_array($userdata) || empty($userdata['namepanel']) || !array_key_exists('maxtime', $userdata)) {
         nm_adminInstantReply($from_id, "❌ اطلاعات مرحله قبلی ناقص است. لطفاً دوباره تلاش کنید.", $backadmin, 'HTML');
         step('home', $from_id);
         return;
