@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/BaseHandler.php';
+require_once __DIR__ . '/DiscountSupport.php';
 
 final class PurchaseHandler extends BaseHandler
 {
@@ -56,6 +57,24 @@ final class PurchaseHandler extends BaseHandler
         if ($discount !== 0) {
             $delta = ($product['price_product'] * $discount) / 100;
             $product['price_product'] = $product['price_product'] - $delta;
+        }
+
+        $discountCode = FaoximaInput::string($this->data, 'discount_code');
+        if ($discountCode !== '') {
+            $dv = MiniDiscount::validateSell(
+                $discountCode,
+                'buy',
+                (string)($product['code_product'] ?? ''),
+                (string)($panel['code_panel'] ?? ''),
+                $this->user
+            );
+            if (empty($dv['ok'])) {
+                FaoximaResponse::fail(422, (string)($dv['reason'] ?? '❌ کد تخفیف نامعتبر است.'));
+            }
+            $pct = (int)$dv['percent'];
+            $product['price_product'] = (float)$product['price_product'] - (((float)$product['price_product'] * $pct) / 100);
+            if ($product['price_product'] < 0) $product['price_product'] = 0;
+            MiniDiscount::markSellUsed($discountCode, $this->user);
         }
 
 

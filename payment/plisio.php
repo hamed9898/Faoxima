@@ -106,12 +106,13 @@ if ($apiKey === '' || $apiKey === '0') {
 }
 
 if (!rxPlisio_verifySignature($data, $apiKey)) {
-    http_response_code(401);
-    rxPlisio_log('PLISIO_SIG_FAIL', 'Signature verification failed', [
-        'ip'    => $_SERVER['REMOTE_ADDR'] ?? '?',
-        'order' => $data['order_number'] ?? null,
-    ]);
-    exit('bad signature');
+    // Unverified IPN: ACK with 200 (not 401) so Plisio stops retrying and this
+    // expected, self-recovering case is not recorded as a failed request. We never
+    // process unverified data below; the polling cron (cronbot/plisio.php) confirms
+    // the payment, so nothing is lost.
+    http_response_code(200);
+    echo 'ok';
+    return;
 }
 
 $status     = strtolower(trim((string)($data['status']        ?? '')));

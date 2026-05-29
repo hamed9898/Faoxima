@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/BaseHandler.php';
+require_once __DIR__ . '/DiscountSupport.php';
 
 final class ServiceRenewConfirmHandler extends BaseHandler
 {
@@ -72,6 +73,25 @@ final class ServiceRenewConfirmHandler extends BaseHandler
         }
 
 
+        $discountCode = FaoximaInput::string($this->data, 'discount_code');
+        if ($discountCode !== '') {
+            $dv = MiniDiscount::validateSell(
+                $discountCode,
+                'extend',
+                (string)($product['code_product'] ?? ''),
+                (string)($panel['code_panel'] ?? ''),
+                $this->user
+            );
+            if (empty($dv['ok'])) {
+                FaoximaResponse::fail(422, (string)($dv['reason'] ?? '❌ کد تخفیف نامعتبر است.'));
+            }
+            $pct = (int)$dv['percent'];
+            $product['price_product'] = (float)$product['price_product'] - (((float)$product['price_product'] * $pct) / 100);
+            if ($product['price_product'] < 0) $product['price_product'] = 0;
+            MiniDiscount::markSellUsed($discountCode, $this->user);
+        }
+
+
         $discount = (int)($this->user['pricediscount'] ?? 0);
         $finalPrice = (float)$product['price_product'];
         if ($discount !== 0) {
@@ -103,10 +123,53 @@ final class ServiceRenewConfirmHandler extends BaseHandler
             $amountDue = (int) ceil($shortfall);
             if ($amountDue <= 1) $amountDue = 0;
 
+            $idOrder = bin2hex(random_bytes(2));
+            $soCode = ((string)$product['code_product'] === 'customvolume') ? 'custom_volume' : (string)$product['code_product'];
 
-            update('user', 'Processing_value_one',  $invoice['username'] . '%' . $product['code_product'], 'id', $this->user['id']);
-            update('user', 'Processing_value_tow',  'getextenduser',                                       'id', $this->user['id']);
-            update('user', 'Processing_value_four', 'ext_' . $invoice['id_invoice'] . '_' . $finalPrice,    'id', $this->user['id']);
+            $oldDataLimit = '';
+            $oldExpire = '';
+            try {
+                $mp = new ManagePanel();
+                $remote = $mp->DataUser($invoice['Service_location'], $invoice['username']);
+                if (is_array($remote)) {
+                    $oldDataLimit = (string)($remote['data_limit'] ?? '');
+                    $oldExpire    = (string)($remote['expire'] ?? '');
+                }
+            } catch (Throwable $e) {
+            }
+
+            $soValue = json_encode([
+                'volumebuy'    => (int)$product['Volume_constraint'],
+                'Service_time' => (int)$product['Service_time'],
+                'oldvolume'    => $oldDataLimit,
+                'oldtime'      => $oldExpire,
+                'code_product' => $soCode,
+                'id_order'     => $idOrder,
+            ], JSON_UNESCAPED_UNICODE);
+
+            try {
+                $pdo = FaoximaDb::pdo();
+                $stmt = $pdo->prepare(
+                    "INSERT IGNORE INTO service_other
+                        (id_user, username, value, type, time, price, output, status)
+                     VALUES (:u, :n, :v, 'extend_user', :t, :p, '', 'unpaid')"
+                );
+                $stmt->execute([
+                    ':u' => $this->user['id'],
+                    ':n' => $invoice['username'],
+                    ':v' => $soValue,
+                    ':t' => date('Y/m/d H:i:s'),
+                    ':p' => (int)round((float)$product['price_product']),
+                ]);
+            } catch (Throwable $e) {
+                FaoximaResponse::fail(500, '❌ خطا در ثبت درخواست تمدید. لطفاً دوباره تلاش کنید.');
+            }
+
+            update('user', 'Processing_value',      $amountDue,                                'id', $this->user['id']);
+            update('user', 'Processing_value_one',  $invoice['username'] . '%' . $idOrder,     'id', $this->user['id']);
+            update('user', 'Processing_value_tow',  'getextenduser',                           'id', $this->user['id']);
+            update('user', 'Processing_value_four', '',                                        'id', $this->user['id']);
+
 
             FaoximaResponse::ok([
                 'kind'        => 'requires_payment',
@@ -172,14 +235,27 @@ final class ServiceRenewConfirmHandler extends BaseHandler
 
         $managePanel = new ManagePanel();
 
-        $extend = $managePanel->extend(
-            $panel['Methodextend'] ?? '',
-            (int)$product['Volume_constraint'],
-            (int)$product['Service_time'],
-            (string)$invoice['username'],
-            (string)$product['code_product'],
-            (string)$panel['code_panel']
-        );
+
+        try {
+            $extend = $managePanel->extend(
+                $panel['Methodextend'] ?? '',
+                (int)$product['Volume_constraint'],
+                (int)$product['Service_time'],
+                (string)$invoice['username'],
+                (string)$product['code_product'],
+                (string)$panel['code_panel']
+            );
+        } catch (Throwable $e) {
+            FaoximaLogger::exception($e, 'ManagePanel->extend threw at renew', [
+                'user_id'  => $this->user['id'],
+                'username' => $invoice['username'] ?? null,
+            ]);
+            if ($balanceCharged) {
+                balance_atomic_credit($this->user['id'], $finalPrice);
+            }
+            FaoximaResponse::fail(502, '❌ خطایی در تمدید سرویس رخ داده با پشتیبانی در ارتباط باشید');
+        }
+
 
         if (!is_array($extend) || ($extend['status'] ?? null) === false) {
             $reason = is_array($extend) ? json_encode($extend['msg'] ?? $extend) : (string)$extend;
@@ -265,6 +341,7 @@ final class ServiceRenewConfirmHandler extends BaseHandler
             'cashback'  => $cashback,
         ]);
 
+
         FaoximaResponse::ok([
             'kind'          => 'done',
             'message'       => '✅ سرویس شما با موفقیت تمدید شد.',
@@ -313,12 +390,29 @@ final class ServiceRenewConfirmHandler extends BaseHandler
     private function jsonAgentValue($raw, string $agent, $default = '')
     {
         if (is_array($raw)) {
-            return $raw[$agent] ?? $default;
+            return $this->pickAgent($raw, $agent, $default);
         }
-        if (!is_string($raw) || $raw === '') return $default;
+        if (!is_string($raw)) return $default;
+        $raw = trim($raw);
+        if ($raw === '') return $default;
         $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) return $default;
-        return $decoded[$agent] ?? $default;
+        if (!is_array($decoded)) {
+            return is_numeric($raw) ? $raw : $default;
+        }
+        return $this->pickAgent($decoded, $agent, $default);
+    }
+
+    private function pickAgent(array $map, string $agent, $default)
+    {
+        foreach ([$agent, 'allusers', 'f'] as $key) {
+            if (array_key_exists($key, $map)) {
+                $val = $map[$key];
+                if ($val !== '' && $val !== null) {
+                    return $val;
+                }
+            }
+        }
+        return $default;
     }
 
     private function reportError(string $text): void

@@ -535,15 +535,14 @@ async function renderRenewPanel($panel, info, username, reload) {
     const current = opts.current_plan || null;
     const showPrice = !!opts.show_price;
     const custom = opts.custom || {};
-    const customForce = !!custom.force;
     const $list = $panel.querySelector('#renew-list');
 
-    if (products.length === 0 && !customForce && !custom.enabled) {
+    if (products.length === 0 && !custom.enabled) {
         $list.innerHTML = `
             <div class="empty">
                 ${icon('info', 'class="ico ico-xxl ico-muted"')}
                 <h3>پلنی برای تمدید یافت نشد</h3>
-                <p class="muted">برای این پنل، محصولی فعال نیست.</p>
+                <p class="muted">برای این پنل، محصول یا تعرفه‌ی حجم دلخواه فعالی تنظیم نشده است. لطفاً با پشتیبانی در ارتباط باشید.</p>
             </div>`;
         return;
     }
@@ -607,10 +606,16 @@ async function renderRenewPanel($panel, info, username, reload) {
             renderRenewConfirm($panel, opts, choice, username, reload);
         }
     });
+
+    if (products.length === 0 && custom.enabled) {
+        renderRenewCustomForm($panel, opts, username, reload);
+    }
 }
 
 function renderRenewCustomForm($panel, opts, username, reload) {
     const c = opts.custom || {};
+    const volFixed = Number(c.min_volume_gb) === Number(c.max_volume_gb) && Number(c.max_volume_gb) > 0;
+    const timeFixed = Number(c.min_time_days) === Number(c.max_time_days) && Number(c.max_time_days) > 0;
     const $host = $panel.querySelector('#renew-confirm-host');
     $panel.querySelector('#renew-pay-host').innerHTML = '';
     $host.innerHTML = `
@@ -618,18 +623,20 @@ function renderRenewCustomForm($panel, opts, username, reload) {
             <p class="section-title">${icon('settings')} پلن سفارشی</p>
             <p class="muted" style="font-size:13px">
                 حجم: بین ${fmtNum(c.min_volume_gb)} و ${fmtNum(c.max_volume_gb)} گیگابایت ·
-                زمان: بین ${fmtNum(c.min_time_days)} و ${fmtNum(c.max_time_days)} روز
+                زمان: ${timeFixed ? `${fmtNum(c.min_time_days)} روز` : `بین ${fmtNum(c.min_time_days)} و ${fmtNum(c.max_time_days)} روز`}
             </p>
             <div class="form-row mt-sm">
                 <label class="muted" style="font-size:12px">حجم (گیگابایت)</label>
                 <input id="cv-volume" type="number" inputmode="numeric"
                        min="${c.min_volume_gb}" max="${c.max_volume_gb}"
+                       value="${volFixed ? c.min_volume_gb : ''}" ${volFixed ? 'readonly' : ''}
                        placeholder="${c.min_volume_gb}-${c.max_volume_gb}" />
             </div>
             <div class="form-row mt-sm">
                 <label class="muted" style="font-size:12px">زمان (روز)</label>
                 <input id="cv-time" type="number" inputmode="numeric"
                        min="${c.min_time_days}" max="${c.max_time_days}"
+                       value="${timeFixed ? c.min_time_days : ''}" ${timeFixed ? 'readonly' : ''}
                        placeholder="${c.min_time_days}-${c.max_time_days}" />
             </div>
             <div class="kv mt-md">
@@ -654,6 +661,7 @@ function renderRenewCustomForm($panel, opts, username, reload) {
     };
     $vol.addEventListener('input', recompute);
     $time.addEventListener('input', recompute);
+    recompute();
 
     const $submit = $host.querySelector('#cv-submit');
     const $label = $submit.querySelector('.cv-label');
@@ -705,12 +713,19 @@ function renderRenewConfirm($panel, opts, choice, username, reload) {
             </div>`).join('')}
             <div class="kv">
                 <span class="kv-label">${icon('coin')} مبلغ</span>
-                <span class="kv-value mono accent" style="font-size:18px;font-weight:700">${fmtNum(choice.price)} تومان</span>
+                <span class="kv-value mono accent" style="font-size:18px;font-weight:700" id="rc-amount">${fmtNum(choice.price)} تومان</span>
             </div>
             <div class="kv">
                 <span class="kv-label">${icon('wallet')} موجودی</span>
                 <span class="kv-value mono">${fmtNum(balance)} تومان</span>
             </div>
+
+            <div class="form-row mt-sm" style="display:flex;gap:8px">
+                <input id="rc-discount" type="text" inputmode="text" autocomplete="off"
+                       placeholder="کد تخفیف (اختیاری)" style="flex:1" />
+                <button id="rc-discount-apply" type="button" class="btn btn-secondary">اعمال</button>
+            </div>
+            <p class="muted" id="rc-discount-msg" style="font-size:12px;display:none"></p>
 
             <button id="rc-submit" type="button" class="btn btn-primary btn-block mt-md">
                 ${icon('check', 'class="ico ico-leading"')}
@@ -718,6 +733,40 @@ function renderRenewConfirm($panel, opts, choice, username, reload) {
             </button>
         </div>
     `;
+
+    let appliedDiscount = '';
+    const basePrice = Number(choice.price || 0);
+    const $disc = $host.querySelector('#rc-discount');
+    const $discApply = $host.querySelector('#rc-discount-apply');
+    const $discMsg = $host.querySelector('#rc-discount-msg');
+    const $amount = $host.querySelector('#rc-amount');
+    if ($discApply && $disc) {
+        $discApply.addEventListener('click', async () => {
+            const code = String($disc.value || '').trim();
+            if (!code) { toast('کد تخفیف را وارد کنید', 'warn'); return; }
+            $discApply.disabled = true;
+            try {
+                const r = await call('discount_validate', {
+                    method: 'POST',
+                    body: { code, context: 'extend', username, base_price: basePrice },
+                });
+                const obj = r?.obj || {};
+                appliedDiscount = code;
+                if (obj.final_price != null && $amount) $amount.textContent = `${fmtNum(obj.final_price)} تومان`;
+                $discMsg.style.display = 'block';
+                $discMsg.textContent = obj.message || 'کد تخفیف اعمال شد';
+                hapticNotify('success');
+            } catch (err) {
+                appliedDiscount = '';
+                $discMsg.style.display = 'block';
+                $discMsg.textContent = err.message || 'کد تخفیف نامعتبر است';
+                if ($amount) $amount.textContent = `${fmtNum(basePrice)} تومان`;
+                hapticNotify('error');
+            } finally {
+                $discApply.disabled = false;
+            }
+        });
+    }
 
     const $btn = $host.querySelector('#rc-submit');
     const $label = $btn.querySelector('.rc-label');
@@ -732,6 +781,9 @@ function renderRenewConfirm($panel, opts, choice, username, reload) {
                 body.custom = choice.custom;
             } else {
                 body.product_code = choice.code;
+            }
+            if (appliedDiscount) {
+                body.discount_code = appliedDiscount;
             }
             const res = await call('service_renew_confirm', { method: 'POST', body });
             const obj = res?.obj || {};
@@ -851,7 +903,7 @@ async function renderRenewInlinePayment($panel, pay, reload) {
                 body: {
                     method: method.id,
                     amount: amountDue,
-                    purchase_username: username,
+                    renew_username: username,
                 },
             });
             const obj = r?.obj || {};
@@ -1050,7 +1102,7 @@ async function renderExtraInlinePayment($host, pay, reload) {
                 body: {
                     method: method.id,
                     amount: amountDue,
-                    purchase_username: username,
+                    renew_username: username,
                 },
             });
             const obj = r?.obj || {};

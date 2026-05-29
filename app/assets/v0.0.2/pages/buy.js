@@ -486,6 +486,11 @@ export async function buy(view) {
                 </div>
             ` : ''}
 
+            <div class="form-row">
+                <label for="buy-discount">کد تخفیف (اختیاری)</label>
+                <input id="buy-discount" type="text" autocomplete="off" placeholder="در صورت داشتن کد تخفیف وارد کنید" maxlength="60" />
+            </div>
+
             <button class="btn btn-primary btn-block mt-md" id="do-purchase">
                 <span>پرداخت و ساخت سرویس</span>
                 <span class="arrow">→</span>
@@ -503,6 +508,7 @@ export async function buy(view) {
         $btn.addEventListener('click', async () => {
             const customUsername = host.querySelector('#custom-username')?.value?.trim() || '';
             const customNote = host.querySelector('#custom-note')?.value?.trim() || '';
+            const discountCode = host.querySelector('#buy-discount')?.value?.trim() || '';
 
             if (usernameRequired && !customUsername) {
                 toast('برای این پنل نام کاربری دلخواه ضروری است؛ لطفاً نام کاربری انتخاب کنید.', 'error');
@@ -532,6 +538,7 @@ export async function buy(view) {
                 }
                 if (customUsername) body.custom_username = customUsername;
                 if (customNote)     body.custom_note     = customNote;
+                if (discountCode)   body.discount_code   = discountCode;
 
                 const res = await call('purchase', { method: 'POST', body });
 

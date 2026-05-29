@@ -90,6 +90,8 @@ try {
         'brand_upload_logo'      => ['class' => 'BrandHandler', 'mode' => 'upload'],
         'service_configs'        => 'ServiceConfigsHandler',
         'pending_payments'       => 'PendingPaymentsHandler',
+        'redeem_giftcode'        => 'GiftCodeHandler',
+        'discount_validate'      => 'DiscountValidateHandler',
     ];
 
     $payload = FaoximaInput::payload();

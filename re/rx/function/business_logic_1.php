@@ -32,7 +32,13 @@ function sendMessageService($panel_info, $config, $sub_link, $username_service, 
     if (!check_active_btn($setting['keyboardmain'], "text_help"))
         $reply_markup = null;
     $user_id = $user_id == null ? $from_id : $user_id;
-    $STATUS_SEND_MESSAGE_PHOTO = $panel_info['config'] == "onconfig" && count($config) != 1 ? false : true;
+    // Send the photo (Info Card / QR) whenever a usable sublink exists — the QR is
+    // built from the sublink anyway (a single link covering all configs). Only fall
+    // back to plain text when there is NO sublink AND the panel returns ≠1 individual
+    // configs. Without this, custom-volume services (which return 0 individual configs,
+    // only a sublink) were delivered as plain text instead of the Info Card / QR.
+    $rxHasSubLink = ((($panel_info['sublink'] ?? '') == "onsublink") && is_string($sub_link) && trim($sub_link) !== '');
+    $STATUS_SEND_MESSAGE_PHOTO = (!$rxHasSubLink && $panel_info['config'] == "onconfig" && count($config) != 1) ? false : true;
     $out_put_qrcode = "";
     if ($panel_info['type'] == "Manualsale" || $panel_info['type'] == "ibsng" || $panel_info['type'] == "mikrotik") {
     }
@@ -90,7 +96,7 @@ function sendMessageService($panel_info, $config, $sub_link, $username_service, 
     } else {
         sendmessage($user_id, $caption, $reply_markup, 'HTML');
     }
-    if ($panel_info['config'] == "onconfig" && $setting['status_keyboard_config'] == "1") {
+    if ($panel_info['config'] == "onconfig" && $setting['status_keyboard_config'] == "1" && function_exists('keyboard_config')) {
         if (is_array($config)) {
             $validConfigs = array_values(array_filter($config, function ($item) {
                 return is_string($item) && trim($item) !== '';

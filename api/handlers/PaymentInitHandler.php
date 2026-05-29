@@ -61,8 +61,26 @@ final class PaymentInitHandler extends BaseHandler
         $this->user['Processing_value'] = $amount;
 
 
+        $renewUsername = FaoximaInput::nullableString($this->data, 'renew_username');
         $purchaseUsername = FaoximaInput::nullableString($this->data, 'purchase_username');
-        if ($purchaseUsername !== null && $purchaseUsername !== '') {
+        if ($renewUsername !== null && $renewUsername !== '') {
+
+            $serviceExists = (int) FaoximaDb::fetchScalar(
+                "SELECT COUNT(*) FROM invoice WHERE username = :u AND id_user = :uid",
+                [':u' => $renewUsername, ':uid' => $this->user['id']]
+            );
+            if ($serviceExists === 0) {
+                FaoximaResponse::fail(404, '❌ سرویسی برای تمدید با این نام کاربری پیدا نشد.');
+            }
+
+            $tow = (string)($this->user['Processing_value_tow'] ?? '');
+            $one = (string)($this->user['Processing_value_one'] ?? '');
+            $allowedTow = ['getextenduser', 'getextravolumeuser', 'getextratimeuser'];
+            if (!in_array($tow, $allowedTow, true) || $one === '' || strpos($one, '%') === false) {
+                FaoximaResponse::fail(409, '❌ مراحل تمدید کامل نشده است. لطفاً تمدید را از ابتدا انجام دهید.');
+            }
+
+        } elseif ($purchaseUsername !== null && $purchaseUsername !== '') {
 
 
             $unpaidInvoiceExists = (int) FaoximaDb::fetchScalar(

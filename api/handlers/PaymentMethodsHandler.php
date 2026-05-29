@@ -230,11 +230,22 @@ final class PaymentMethodsHandler extends BaseHandler
         }
         unset($m);
 
+        $envMin = null;
+        $envMax = null;
+        foreach ($methods as $m) {
+            $mm = (int)($m['min'] ?? 0);
+            $xx = (int)($m['max'] ?? 0);
+            if ($mm > 0) $envMin = ($envMin === null) ? $mm : min($envMin, $mm);
+            if ($xx > 0) $envMax = ($envMax === null) ? $xx : max($envMax, $xx);
+        }
+        $displayMin = $envMin !== null ? $envMin : (int)$minBalance;
+        $displayMax = $envMax !== null ? $envMax : (int)$maxBalance;
+
         FaoximaResponse::ok([
             'methods'  => $methods,
             'limits'   => [
-                'min' => (int)$minBalance,
-                'max' => (int)$maxBalance,
+                'min' => $displayMin,
+                'max' => $displayMax,
             ],
             'balance'  => (float)($user['Balance'] ?? 0),
             'currency' => 'تومان',
@@ -243,10 +254,25 @@ final class PaymentMethodsHandler extends BaseHandler
 
     private function jsonAgentValue(string $json, string $agent, $default)
     {
+        $json = trim($json);
         if ($json === '') return $default;
+
         $decoded = json_decode($json, true);
-        if (!is_array($decoded)) return $default;
-        return $decoded[$agent] ?? $default;
+
+        if (!is_array($decoded)) {
+            return is_numeric($json) ? $json : $default;
+        }
+
+        foreach ([$agent, 'allusers', 'f'] as $key) {
+            if (array_key_exists($key, $decoded)) {
+                $val = $decoded[$key];
+                if ($val !== '' && $val !== null) {
+                    return $val;
+                }
+            }
+        }
+
+        return $default;
     }
 }
 

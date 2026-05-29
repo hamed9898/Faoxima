@@ -103,16 +103,26 @@ final class ServiceRenewOptionsHandler extends BaseHandler
         }
 
 
+        $custom_only = (count($list) === 0)
+            || in_array($invoice['name_product'] ?? '', ['🛍 حجم دلخواه', '⚙️ سرویس دلخواه'], true);
+
         $customPriceVol  = $this->jsonAgentValue($panel['pricecustomvolume'] ?? '', $agent);
         $customPriceTime = $this->jsonAgentValue($panel['pricecustomtime']   ?? '', $agent);
+        $customStatus    = (string) $this->jsonAgentValue($panel['customvolume'] ?? '', $agent);
         $minVol  = (int) $this->jsonAgentValue($panel['mainvolume'] ?? '', $agent);
         $maxVol  = (int) $this->jsonAgentValue($panel['maxvolume']  ?? '', $agent);
         $minTime = (int) $this->jsonAgentValue($panel['maintime']   ?? '', $agent);
         $maxTime = (int) $this->jsonAgentValue($panel['maxtime']    ?? '', $agent);
 
+        $hasVolPrice  = ($customPriceVol !== '' && $customPriceVol !== null);
+        $hasTimePrice = ($customPriceTime !== '' && $customPriceTime !== null);
+        $timeVariable = ($maxTime > $minTime);
+        $customConfigured = (($panel['type'] ?? '') !== 'Manualsale')
+            && $hasVolPrice
+            && (!$timeVariable || $hasTimePrice);
+        $customEnabled   = $customConfigured
+            && ($customStatus === '1' || $custom_only);
 
-        $custom_only = (count($list) === 0)
-            || in_array($invoice['name_product'] ?? '', ['🛍 حجم دلخواه', '⚙️ سرویس دلخواه'], true);
 
         FaoximaResponse::ok([
             'username'        => (string)$invoice['username'],
@@ -127,7 +137,7 @@ final class ServiceRenewOptionsHandler extends BaseHandler
             'discount'        => $userDiscount,
             'balance'         => (float)($this->user['Balance'] ?? 0),
             'custom'          => [
-                'enabled'        => ($customPriceVol !== '' && $customPriceTime !== ''),
+                'enabled'        => $customEnabled,
                 'price_per_gb'   => (int)$customPriceVol,
                 'price_per_day'  => (int)$customPriceTime,
                 'min_volume_gb'  => $minVol,
@@ -142,12 +152,29 @@ final class ServiceRenewOptionsHandler extends BaseHandler
     private function jsonAgentValue($raw, string $agent, $default = '')
     {
         if (is_array($raw)) {
-            return $raw[$agent] ?? $default;
+            return $this->pickAgent($raw, $agent, $default);
         }
-        if (!is_string($raw) || $raw === '') return $default;
+        if (!is_string($raw)) return $default;
+        $raw = trim($raw);
+        if ($raw === '') return $default;
         $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) return $default;
-        return $decoded[$agent] ?? $default;
+        if (!is_array($decoded)) {
+            return is_numeric($raw) ? $raw : $default;
+        }
+        return $this->pickAgent($decoded, $agent, $default);
+    }
+
+    private function pickAgent(array $map, string $agent, $default)
+    {
+        foreach ([$agent, 'allusers', 'f'] as $key) {
+            if (array_key_exists($key, $map)) {
+                $val = $map[$key];
+                if ($val !== '' && $val !== null) {
+                    return $val;
+                }
+            }
+        }
+        return $default;
     }
 }
 

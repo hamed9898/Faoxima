@@ -28,6 +28,7 @@ export function ready() {
         if (!w) return;
         if (typeof w.ready === 'function') w.ready();
         if (typeof w.expand === 'function') w.expand();
+        if (typeof w.disableVerticalSwipes === 'function') w.disableVerticalSwipes();
 
         if (typeof w.setHeaderColor === 'function') w.setHeaderColor('#0a0907');
         if (typeof w.setBackgroundColor === 'function') w.setBackgroundColor('#0a0907');

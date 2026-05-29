@@ -116,6 +116,7 @@ if (!function_exists('rx_cron_load_payment_context')) {
             $root . '/botapi.php',
             $root . '/panels.php',
             $root . '/function.php',
+            $root . '/keyboard.php',
             $root . '/jdf.php',
         ];
         if (!rx_cron_require_or_skip('payment_context', $required)) {

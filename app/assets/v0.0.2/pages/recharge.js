@@ -97,11 +97,21 @@ export async function recharge(view) {
     $host.innerHTML = `
         <div class="kv">
             <span class="kv-label">${icon('wallet')} موجودی فعلی</span>
-            <span class="kv-value accent">${escapeHtml(fmtPrice(balance))}</span>
+            <span class="kv-value accent" id="wallet-balance">${escapeHtml(fmtPrice(balance))}</span>
         </div>
         <div class="kv">
             <span class="kv-label">${icon('chart')} بازه مجاز شارژ</span>
             <span class="kv-value mono">${escapeHtml(fmtPrice(limits.min))} — ${escapeHtml(fmtPrice(limits.max))}</span>
+        </div>
+
+        <div class="card-section mt-md">
+            <p class="section-title">${icon('coin', 'class="ico ico-leading"')} کد هدیه</p>
+            <p class="muted" style="font-size:12px">اگر کد هدیه دارید، آن را وارد کنید تا مبلغ آن به کیف پول شما اضافه شود.</p>
+            <div class="form-row mt-sm" style="display:flex;gap:8px">
+                <input id="gift-code" type="text" inputmode="text" autocomplete="off"
+                       placeholder="کد هدیه" style="flex:1" />
+                <button id="gift-submit" type="button" class="btn btn-secondary">ثبت</button>
+            </div>
         </div>
 
         <div class="payment-methods mt-md" id="pay-list">
@@ -111,6 +121,33 @@ export async function recharge(view) {
         <div id="pay-form-host"></div>
         <div id="pay-result-host"></div>
     `;
+
+    const $giftInput = view.querySelector('#gift-code');
+    const $giftSubmit = view.querySelector('#gift-submit');
+    if ($giftSubmit && $giftInput) {
+        $giftSubmit.addEventListener('click', async () => {
+            const code = String($giftInput.value || '').trim();
+            if (!code) { toast('کد هدیه را وارد کنید', 'warn'); return; }
+            $giftSubmit.disabled = true;
+            const old = $giftSubmit.textContent;
+            $giftSubmit.textContent = '...';
+            try {
+                const r = await call('redeem_giftcode', { method: 'POST', body: { code } });
+                const obj = r?.obj || {};
+                hapticNotify('success');
+                toast(obj.message || 'کد هدیه اعمال شد', 'success', 4000);
+                const $bal = view.querySelector('#wallet-balance');
+                if ($bal && obj.new_balance != null) $bal.textContent = fmtPrice(Number(obj.new_balance));
+                $giftInput.value = '';
+            } catch (err) {
+                hapticNotify('error');
+                toast(err.message || 'کد هدیه نامعتبر است', 'error', 4000);
+            } finally {
+                $giftSubmit.disabled = false;
+                $giftSubmit.textContent = old;
+            }
+        });
+    }
 
     const $list = view.querySelector('#pay-list');
     $list.addEventListener('click', async (e) => {

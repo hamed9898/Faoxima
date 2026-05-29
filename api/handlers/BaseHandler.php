@@ -25,6 +25,9 @@ abstract class BaseHandler
 
     private static $adminLookupCache = [];
 
+
+    private static $diagRequestId = null;
+
     public function __construct(array $user, array $data)
     {
         $this->user = $user;
@@ -43,6 +46,54 @@ abstract class BaseHandler
         $value = is_array($row) ? (string)($row['ValuePay'] ?? $default) : $default;
         self::$paySettingCache[$name] = $value;
         return $value;
+    }
+
+
+    protected function diag(string $channel, string $step, array $ctx = []): void
+    {
+        try {
+            $base = dirname(__DIR__, 2) . '/logs';
+            if (!is_dir($base)) {
+                @mkdir($base, 0775, true);
+            }
+
+            $entry = [
+                'ts'      => date('Y-m-d H:i:s'),
+                'req'     => $this->diagRequestId(),
+                'channel' => $channel,
+                'step'    => $step,
+                'user_id' => $this->user['id'] ?? null,
+                'agent'   => $this->user['agent'] ?? null,
+                'method'  => $_SERVER['REQUEST_METHOD'] ?? 'CLI',
+                'ctx'     => $ctx,
+            ];
+
+            $line = json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($line === false) {
+                $line = json_encode([
+                    'ts'      => date('Y-m-d H:i:s'),
+                    'channel' => $channel,
+                    'step'    => $step,
+                    'ctx'     => '<unencodable diagnostic context>',
+                ]);
+            }
+
+            $file = $base . '/' . $channel . '-' . date('Y-m-d') . '.log';
+            @file_put_contents($file, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (Throwable $e) {
+        }
+    }
+
+    private function diagRequestId(): string
+    {
+        if (self::$diagRequestId === null) {
+            try {
+                self::$diagRequestId = bin2hex(random_bytes(4));
+            } catch (Throwable $e) {
+                self::$diagRequestId = substr(md5(uniqid('', true)), 0, 8);
+            }
+        }
+        return self::$diagRequestId;
     }
 
 

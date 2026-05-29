@@ -314,7 +314,12 @@ final class ServiceExtraHandler extends BaseHandler
         }
 
         $agent = (string)($this->user['agent'] ?? 'f');
-        $priceField = $kind === 'time' ? 'priceextratime' : 'priceextravolume';
+        $isCustomService = in_array($invoice['name_product'] ?? '', ['🛍 حجم دلخواه', '⚙️ سرویس دلخواه'], true);
+        if ($isCustomService) {
+            $priceField = $kind === 'time' ? 'pricecustomtime' : 'pricecustomvolume';
+        } else {
+            $priceField = $kind === 'time' ? 'priceextratime' : 'priceextravolume';
+        }
         $pricePerUnit = (int) $this->jsonAgentValue($panel[$priceField] ?? '', $agent, 0);
         if ($pricePerUnit <= 0) {
             FaoximaResponse::fail(503, '❌ تعرفه خرید اضافه روی این پنل تنظیم نشده است.');
