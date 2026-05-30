@@ -131,6 +131,19 @@ $SETTING_GROUPS = [
             ['type' => 'toggle', 'col' => 'premium_emoji_status','label' => 'ایموجی پریمیوم تلگرام',        'on' => '1',                   'off' => '0'],
         ],
     ],
+
+    'proxy' => [
+        'title' => 'پراکسی (برای هاست‌های ایران)',
+        'icon'  => 'shield',
+        'fields' => [
+            ['type' => 'toggle', 'col' => 'proxy_telegram_status', 'label' => 'استفاده از پراکسی برای اتصال به تلگرام', 'on' => '1', 'off' => '0'],
+            ['type' => 'text',   'col' => 'proxy_telegram_url',    'label' => 'آدرس پراکسی تلگرام', 'placeholder' => 'socks5h://user:pass@1.2.3.4:1080',
+             'hint'  => 'قالب: scheme://[user:pass@]host:port — پشتیبانی از http، socks4، socks5 و socks5h. اگر scheme ننویسید http در نظر گرفته می‌شود. برای رد کردن DNS از داخل ایران، socks5h توصیه می‌شود.'],
+            ['type' => 'toggle', 'col' => 'proxy_panel_status',    'label' => 'استفاده از پراکسی برای اتصال به پنل‌ها', 'on' => '1', 'off' => '0'],
+            ['type' => 'text',   'col' => 'proxy_panel_url',       'label' => 'آدرس پراکسی پنل‌ها', 'placeholder' => 'socks5h://user:pass@1.2.3.4:1080',
+             'hint'  => 'برای اتصال ربات به پنل‌های خارج از ایران (مرزبان، 3x-ui و …) از این پراکسی استفاده می‌شود. می‌توانید همان پراکسی تلگرام را وارد کنید.'],
+        ],
+    ],
 ];
 
 

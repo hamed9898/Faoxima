@@ -101,6 +101,9 @@ function telegram($method, $datas = [], $token = null)
         curl_setopt($ch, CURLOPT_TCP_KEEPALIVE, 1);
         curl_setopt($ch, CURLOPT_TCP_KEEPIDLE, 60);
         curl_setopt($ch, CURLOPT_TCP_KEEPINTVL, 30);
+        if (function_exists('faoxima_apply_curl_proxy')) {
+            faoxima_apply_curl_proxy($ch, 'telegram');
+        }
         if (!empty($preparedPayload['headers'])) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $preparedPayload['headers']);
         }

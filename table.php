@@ -396,6 +396,11 @@ try {
         addFieldToTable("setting", "antispam_msg_count", "5", "VARCHAR(20)");
         addFieldToTable("setting", "antispam_seconds", "3", "VARCHAR(20)");
         addFieldToTable("setting", "antispam_mute_seconds", "5", "VARCHAR(20)");
+
+        addFieldToTable("setting", "proxy_telegram_status", "0", "VARCHAR(20)");
+        addFieldToTable("setting", "proxy_telegram_url", "", "VARCHAR(500)");
+        addFieldToTable("setting", "proxy_panel_status", "0", "VARCHAR(20)");
+        addFieldToTable("setting", "proxy_panel_url", "", "VARCHAR(500)");
     }
 } catch (Exception $e) {
     error_log('[panels] ' . $e->getMessage());
