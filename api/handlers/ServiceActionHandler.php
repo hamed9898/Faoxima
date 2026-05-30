@@ -323,6 +323,7 @@ final class ServiceActionHandler extends BaseHandler
             'disable_web_page_preview' => true,
         ];
         $ch = curl_init($url);
+        if (function_exists('faoxima_apply_curl_proxy')) faoxima_apply_curl_proxy($ch, 'telegram');
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query($payload),

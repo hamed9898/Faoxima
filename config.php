@@ -81,3 +81,5 @@ $GLOBALS['usernamebot']                = $usernamebot;
 $GLOBALS['telegramCurlTimeout']        = $telegramCurlTimeout;
 $GLOBALS['telegramStrictIpValidation'] = $telegramStrictIpValidation;
 $GLOBALS['admin_panel_token']          = $admin_panel_token;
+
+require_once __DIR__ . '/proxy.php';
