@@ -41,6 +41,7 @@ function token_panelm($code_panel){
         )
     );
     $curl_token = curl_init($url_get_token);
+    if (function_exists('faoxima_apply_curl_proxy')) faoxima_apply_curl_proxy($curl_token, 'panel');
     curl_setopt_array($curl_token, $options);
     $token = curl_exec($curl_token);
     if (curl_error($curl_token)) {

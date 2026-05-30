@@ -189,6 +189,7 @@ final class PaymentReceiptHandler extends BaseHandler
     private function sendReceiptPhoto(string $apiKey, string $chatId, string $localPath, string $mime, string $caption, string $keyboardJson): ?string
     {
         $ch = curl_init('https://api.telegram.org/bot' . $apiKey . '/sendPhoto');
+        if (function_exists('faoxima_apply_curl_proxy')) faoxima_apply_curl_proxy($ch, 'telegram');
         $post = [
             'chat_id'      => $chatId,
             'caption'      => $caption,
@@ -239,6 +240,7 @@ final class PaymentReceiptHandler extends BaseHandler
             'reply_markup' => $keyboardJson,
         ];
         $ch = curl_init($url);
+        if (function_exists('faoxima_apply_curl_proxy')) faoxima_apply_curl_proxy($ch, 'telegram');
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query($payload),
@@ -266,6 +268,7 @@ final class PaymentReceiptHandler extends BaseHandler
             'reply_markup' => $keyboardJson,
         ];
         $ch = curl_init($url);
+        if (function_exists('faoxima_apply_curl_proxy')) faoxima_apply_curl_proxy($ch, 'telegram');
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query($payload),
