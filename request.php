@@ -84,6 +84,10 @@ class CurlRequest {
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         }
 
+        if (function_exists('faoxima_apply_curl_proxy')) {
+            faoxima_apply_curl_proxy($ch, 'panel');
+        }
+
         $finalHeaders = $this->prepareHeaders();
         if (!empty($finalHeaders)) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $finalHeaders);

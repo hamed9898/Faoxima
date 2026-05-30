@@ -140,6 +140,7 @@ function panel_login_cookie($code_panel)
 {
     $panel = select("marzban_panel", "*", "code_panel", $code_panel, "select");
     $curl = curl_init();
+    if (function_exists('faoxima_apply_curl_proxy')) faoxima_apply_curl_proxy($curl, 'panel');
     curl_setopt_array($curl, array(
         CURLOPT_URL => $panel['url_panel'] . '/login',
         CURLOPT_RETURNTRANSFER => true,
