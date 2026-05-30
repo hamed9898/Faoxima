@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/BaseHandler.php';
+require_once __DIR__ . '/DiscountSupport.php';
 
 final class ServiceExtraHandler extends BaseHandler
 {
@@ -69,6 +70,23 @@ final class ServiceExtraHandler extends BaseHandler
         }
 
         $price = (float) ($amount * $pricePerUnit);
+
+
+        $discountCode = FaoximaInput::string($this->data, 'discount_code');
+        if ($discountCode !== '') {
+            $dv = MiniDiscount::validateSell(
+                $discountCode,
+                $kind === 'time' ? 'time' : 'volume',
+                '',
+                (string)($panel['code_panel'] ?? ''),
+                $this->user
+            );
+            if (empty($dv['ok'])) {
+                FaoximaResponse::fail(422, (string)($dv['reason'] ?? '❌ کد تخفیف نامعتبر است.'));
+            }
+            $price = MiniDiscount::applyToPrice($dv['row'], $price);
+            MiniDiscount::markSellUsed($discountCode, $this->user);
+        }
 
 
         $discount = (int)($this->user['pricediscount'] ?? 0);

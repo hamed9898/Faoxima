@@ -28,6 +28,197 @@ if (!function_exists('balance_atomic_charge')) {
     }
 }
 
+
+if (!function_exists('nm_validateSellDiscount')) {
+    function nm_validateSellDiscount($code, $section, $codeProduct, $codePanel, $user, $from_id)
+    {
+        global $pdo;
+        $code = trim((string)$code);
+        $sections = ['buy', 'extend', 'volume', 'time', 'charge', 'all'];
+        $section = in_array($section, $sections, true) ? $section : 'all';
+        $res = ['ok' => false, 'reason' => '', 'row' => null, 'value_type' => 'percent', 'value' => 0.0, 'label' => ''];
+
+        if ($code === '') {
+            $res['reason'] = '❌ کد تخفیف را وارد کنید.';
+            return $res;
+        }
+
+        if ($section !== 'charge' && intval($user['pricediscount'] ?? 0) != 0) {
+            $res['reason'] = '❌ شما تخفیف اختصاصی دارید و امکان استفاده از کد تخفیف وجود ندارد.';
+            return $res;
+        }
+
+        $agent       = (string)($user['agent'] ?? 'f');
+        $codeProduct = ($codeProduct === '' || $codeProduct === null) ? 'all' : $codeProduct;
+        $codePanel   = ($codePanel === '' || $codePanel === null) ? '/all' : $codePanel;
+
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT * FROM DiscountSell
+                  WHERE codeDiscount = :code
+                    AND (code_product = :cp OR code_product = 'all')
+                    AND (code_panel = :cpan OR code_panel = '/all')
+                    AND (agent = :agent OR agent = 'allusers' OR agent = 'all')
+                    AND (COALESCE(NULLIF(section, ''), type, 'all') = :section
+                         OR COALESCE(NULLIF(section, ''), type, 'all') = 'all')
+                    AND (status IS NULL OR status = '' OR status = 'active')
+                    AND (target_user IS NULL OR target_user = '' OR target_user = :uid)
+                  LIMIT 1"
+            );
+            $stmt->execute([
+                ':code'   => $code,
+                ':cp'     => $codeProduct,
+                ':cpan'   => $codePanel,
+                ':agent'  => $agent,
+                ':section' => $section,
+                ':uid'    => (string)$from_id,
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('nm_validateSellDiscount query failed: ' . $e->getMessage());
+            $res['reason'] = '❌ خطا در بررسی کد تخفیف.';
+            return $res;
+        }
+
+        if (!$row) {
+            $res['reason'] = '❌ کد تخفیف نامعتبر است یا برای این بخش فعال نیست.';
+            return $res;
+        }
+
+        if (intval($row['time']) != 0 && time() >= intval($row['time'])) {
+            $res['reason'] = '❌ زمان کد تخفیف به پایان رسیده است.';
+            return $res;
+        }
+
+        if (intval($row['limitDiscount']) > 0 && intval($row['usedDiscount']) >= intval($row['limitDiscount'])) {
+            $res['reason'] = '❌ ظرفیت استفاده از این کد تخفیف به پایان رسیده است.';
+            return $res;
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM Giftcodeconsumed WHERE id_user = :u AND code = :c");
+            $stmt->execute([':u' => (string)$from_id, ':c' => $code]);
+            $usedByUser = (int)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            $usedByUser = 0;
+        }
+        $useUser = intval($row['useuser']);
+        if ($useUser > 0 && $usedByUser >= $useUser) {
+            $res['reason'] = '⭕️ سقف استفاده شما از این کد تخفیف پر شده است.';
+            return $res;
+        }
+
+        if ((string)($row['usefirst'] ?? '') === '1') {
+            $invoiceCount = select("invoice", "*", "id_user", $from_id, "count");
+            if (intval($invoiceCount) != 0) {
+                $res['reason'] = '❌ این کد تخفیف فقط برای اولین خرید قابل استفاده است.';
+                return $res;
+            }
+        }
+
+        $vt = strtolower(trim((string)($row['value_type'] ?? '')));
+        if (!in_array($vt, ['percent', 'amount', 'free'], true)) {
+            $tcol = strtolower(trim((string)($row['type'] ?? '')));
+            $vt = in_array($tcol, ['percent', 'amount', 'free'], true) ? $tcol : 'percent';
+        }
+        $val = (float)$row['price'];
+        if ($vt === 'percent' && ($val <= 0 || $val > 100)) {
+            $res['reason'] = '❌ درصد کد تخفیف نامعتبر است.';
+            return $res;
+        }
+        if ($vt === 'amount' && $val <= 0) {
+            $res['reason'] = '❌ مبلغ کد تخفیف نامعتبر است.';
+            return $res;
+        }
+
+        $label = $vt === 'free'
+            ? 'رایگان'
+            : ($vt === 'amount' ? number_format($val) . ' تومان' : (string)$row['price'] . ' درصد');
+
+        $res['ok']         = true;
+        $res['row']        = $row;
+        $res['value_type'] = $vt;
+        $res['value']      = $val;
+        $res['label']      = $label;
+        return $res;
+    }
+}
+
+if (!function_exists('nm_applySellDiscountToPrice')) {
+    function nm_applySellDiscountToPrice($row, $price)
+    {
+        $price = (float)$price;
+        $vt = strtolower(trim((string)($row['value_type'] ?? '')));
+        if (!in_array($vt, ['percent', 'amount', 'free'], true)) {
+            $tcol = strtolower(trim((string)($row['type'] ?? '')));
+            $vt = in_array($tcol, ['percent', 'amount', 'free'], true) ? $tcol : 'percent';
+        }
+        $val = (float)($row['price'] ?? 0);
+        if ($vt === 'free')   return 0.0;
+        if ($vt === 'amount') return max(0.0, $price - $val);
+        return max(0.0, $price - ($price * $val / 100));
+    }
+}
+
+if (!function_exists('nm_markSellDiscountUsed')) {
+    function nm_markSellDiscountUsed($code, $from_id, $username = '', $reportContext = '')
+    {
+        global $connect, $setting, $otherreport;
+        $code = trim((string)$code);
+        if ($code === '') return;
+
+        try {
+            $row = select("DiscountSell", "*", "codeDiscount", $code, "select");
+            if ($row != false) {
+                $value = intval($row['usedDiscount']) + 1;
+                update("DiscountSell", "usedDiscount", $value, "codeDiscount", $code);
+            }
+        } catch (Throwable $e) {
+            error_log('nm_markSellDiscountUsed update failed: ' . $e->getMessage());
+        }
+
+        try {
+            $now  = (string)time();
+            $kind = 'sell';
+            $stmt = $connect->prepare("INSERT INTO Giftcodeconsumed (id_user, code, kind, consumed_at) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $from_id, $code, $kind, $now);
+            $stmt->execute();
+            $stmt->close();
+        } catch (Throwable $e) {
+            try {
+                $stmt = $connect->prepare("INSERT INTO Giftcodeconsumed (id_user, code) VALUES (?, ?)");
+                $stmt->bind_param("ss", $from_id, $code);
+                $stmt->execute();
+                $stmt->close();
+            } catch (Throwable $e2) {
+            }
+        }
+
+        if (isset($setting['Channel_Report']) && strlen((string)$setting['Channel_Report']) > 0) {
+            $uname = $username !== '' ? "@{$username} " : '';
+            $ctx   = $reportContext !== '' ? " (بخش: {$reportContext})" : '';
+            $text_report = "⭕️ کاربر {$uname}با آیدی عددی {$from_id} از کد تخفیف {$code}{$ctx} استفاده کرد.";
+            telegram('sendmessage', [
+                'chat_id' => $setting['Channel_Report'],
+                'message_thread_id' => $otherreport ?? null,
+                'text' => $text_report,
+                'parse_mode' => "HTML",
+            ]);
+        }
+    }
+}
+
+if (!function_exists('nm_pending_charge_bonus')) {
+    function nm_pending_charge_bonus($user)
+    {
+        $pv4 = (string)($user['Processing_value_four'] ?? '');
+        if (strpos($pv4, 'chg|') !== 0) return 0;
+        $parts = explode('|', $pv4);
+        $bonus = isset($parts[1]) ? intval($parts[1]) : 0;
+        return max(0, $bonus);
+    }
+}
+
 if (!function_exists('balance_atomic_credit')) {
 
     function balance_atomic_credit($userId, $delta) {
@@ -1372,11 +1563,14 @@ $textonebuy
             ]);
         }
     } else {
-        $Balance_confrim = intval($Balance_id['Balance']) + intval($Payment_report['price']);
+        $__chargeBonus = isset($Payment_report['charge_bonus']) ? intval($Payment_report['charge_bonus']) : 0;
+        $__paidAmount = intval($Payment_report['price']);
+        $__creditAmount = $__paidAmount + $__chargeBonus;
+        $Balance_confrim = intval($Balance_id['Balance']) + $__creditAmount;
         update("user", "Balance", $Balance_confrim, "id", $Payment_report['id_user']);
         update("Payment_report", "payment_Status", "paid", "id_order", $Payment_report['id_order']);
-        $Payment_report['price'] = number_format($Payment_report['price'], 0);
-        $format_price_cart = $Payment_report['price'];
+        update("user", "Processing_value_four", "", "id", $Payment_report['id_user']);
+        $format_price_cart = number_format($__paidAmount, 0);
         if ($Payment_report['Payment_Method'] == "cart to cart" or $Payment_report['Payment_Method'] == "arze digital offline") {
             $textconfrom = "⭕️ یک پرداخت جدید انجام شده است
 افزایش موجودی.
@@ -1388,7 +1582,8 @@ $textonebuy
 ✍️ توضیحات : {$paymentNote}";
             Editmessagetext($from_id, $message_id, $textconfrom, $Confirm_pay);
         }
-        sendmessage($Payment_report['id_user'], "💎 کاربر گرامی مبلغ {$Payment_report['price']} تومان به کیف پول شما واریز گردید با تشکراز پرداخت شما.
+        $__creditFmt = number_format($__creditAmount, 0);
+        sendmessage($Payment_report['id_user'], "💎 کاربر گرامی مبلغ {$__creditFmt} تومان به کیف پول شما واریز گردید با تشکراز پرداخت شما.
                 
 🛒 کد پیگیری شما: {$Payment_report['id_order']}", null, 'HTML');
     }

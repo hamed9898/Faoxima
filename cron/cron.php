@@ -148,7 +148,8 @@ $dispatchAsync = static function (array $urls): void {
         $bustedUrl = $url . (strpos($url, '?') === false ? '?' : '&') . '_t=' . microtime(true);
         $ch = curl_init($bustedUrl);
         if ($ch === false) continue;
-        curl_setopt_array($ch, [
+        $rxResolveHost = parse_url($url, PHP_URL_HOST);
+        $curlOpts = [
             CURLOPT_RETURNTRANSFER  => true,
             CURLOPT_NOSIGNAL        => true,
             CURLOPT_CONNECTTIMEOUT_MS => 1500,
@@ -166,7 +167,14 @@ $dispatchAsync = static function (array $urls): void {
                 'Connection: close',
             ],
             CURLOPT_USERAGENT       => 'CronOrchestrator/2.0 (+internal)',
-        ]);
+        ];
+        if (is_string($rxResolveHost) && $rxResolveHost !== '' && $rxResolveHost !== '127.0.0.1' && $rxResolveHost !== 'localhost') {
+            $curlOpts[CURLOPT_RESOLVE] = [
+                $rxResolveHost . ':443:127.0.0.1',
+                $rxResolveHost . ':80:127.0.0.1',
+            ];
+        }
+        curl_setopt_array($ch, $curlOpts);
         curl_multi_add_handle($multi, $ch);
         $handles[] = $ch;
     }

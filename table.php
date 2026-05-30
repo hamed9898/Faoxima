@@ -13,54 +13,6 @@ require_once 'botapi.php';
 global $connect;
 
 
-(function () {
-
-    if (php_sapi_name() === 'cli') {
-        return;
-    }
-
-
-    $remote = $_SERVER['REMOTE_ADDR'] ?? '';
-    $localIps = ['127.0.0.1', '::1', $_SERVER['SERVER_ADDR'] ?? ''];
-    if ($remote !== '' && in_array($remote, $localIps, true)) {
-        return;
-    }
-
-
-    $providedToken = (string) ($_GET['token'] ?? $_REQUEST['token'] ?? '');
-    if ($providedToken !== '' && function_exists('hash_equals')) {
-        $configToken = '';
-        if (isset($GLOBALS['admin_panel_token']) && is_string($GLOBALS['admin_panel_token'])) {
-            $configToken = trim($GLOBALS['admin_panel_token']);
-        }
-        if ($configToken !== '' && hash_equals($configToken, $providedToken)) {
-            return;
-        }
-
-        try {
-            global $pdo;
-            if (isset($pdo) && $pdo instanceof PDO) {
-                $stmt = $pdo->query("SELECT password FROM admin");
-                if ($stmt) {
-                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $stored = (string) ($row['password'] ?? '');
-                        if ($stored !== '' && hash_equals($stored, $providedToken)) {
-                            return;
-                        }
-                    }
-                }
-            }
-        } catch (Throwable $e) {  }
-    }
-
-
-    http_response_code(404);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html><head><title>Not Found</title></head><body><h1>Not Found</h1></body></html>';
-    exit;
-})();
-
-
 if (!function_exists('rxTableColumnExists')) {
     function rxTableColumnExists($connection, $tableName, $columnName)
     {
@@ -1211,7 +1163,49 @@ try {
 }
 
 try {
-    $result = $connect->query("SHOW TABLES LIKE 'affiliates'");
+    $rx_addcol = function ($table, $col, $ddl) use ($connect) {
+        $chk = $connect->query("SHOW COLUMNS FROM `$table` LIKE '$col'");
+        if ($chk && mysqli_num_rows($chk) != 1) {
+            $connect->query("ALTER TABLE `$table` ADD $col $ddl");
+        }
+    };
+    $rx_tableexists = function ($table) use ($connect) {
+        $r = $connect->query("SHOW TABLES LIKE '$table'");
+        return $r && $r->num_rows > 0;
+    };
+
+    if ($rx_tableexists('DiscountSell')) {
+        $rx_addcol('DiscountSell', 'section', "VARCHAR(20) NULL");
+        $rx_addcol('DiscountSell', 'value_type', "VARCHAR(10) NULL");
+        $rx_addcol('DiscountSell', 'target_user', "VARCHAR(64) NULL");
+        $rx_addcol('DiscountSell', 'status', "VARCHAR(12) NULL");
+        $connect->query("UPDATE DiscountSell SET section = type WHERE (section IS NULL OR section = '') AND type IN ('all','buy','extend')");
+        $connect->query("UPDATE DiscountSell SET section = 'all' WHERE section IS NULL OR section = ''");
+        $connect->query("UPDATE DiscountSell SET value_type = 'percent' WHERE value_type IS NULL OR value_type = '' OR value_type NOT IN ('percent','amount','free')");
+        $connect->query("UPDATE DiscountSell SET agent = 'allusers' WHERE agent = 'all'");
+        $connect->query("UPDATE DiscountSell SET status = 'active' WHERE status IS NULL OR status = ''");
+    }
+
+    if ($rx_tableexists('Discount')) {
+        $rx_addcol('Discount', 'target_user', "VARCHAR(64) NULL");
+        $rx_addcol('Discount', 'expire_at', "VARCHAR(20) NULL");
+        $rx_addcol('Discount', 'status', "VARCHAR(12) NULL");
+        $connect->query("UPDATE Discount SET status = 'active' WHERE status IS NULL OR status = ''");
+    }
+
+    if ($rx_tableexists('Giftcodeconsumed')) {
+        $rx_addcol('Giftcodeconsumed', 'kind', "VARCHAR(8) NULL");
+        $rx_addcol('Giftcodeconsumed', 'consumed_at', "VARCHAR(20) NULL");
+    }
+
+    if ($rx_tableexists('Payment_report')) {
+        $rx_addcol('Payment_report', 'charge_bonus', "VARCHAR(20) NULL");
+    }
+} catch (Exception $e) {
+    error_log('[discount-migrate] ' . $e->getMessage());
+}
+
+try {
     $table_exists = ($result->num_rows > 0);
 
     if (!$table_exists) {

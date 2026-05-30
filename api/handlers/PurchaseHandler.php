@@ -71,9 +71,7 @@ final class PurchaseHandler extends BaseHandler
             if (empty($dv['ok'])) {
                 FaoximaResponse::fail(422, (string)($dv['reason'] ?? '❌ کد تخفیف نامعتبر است.'));
             }
-            $pct = (int)$dv['percent'];
-            $product['price_product'] = (float)$product['price_product'] - (((float)$product['price_product'] * $pct) / 100);
-            if ($product['price_product'] < 0) $product['price_product'] = 0;
+            $product['price_product'] = MiniDiscount::applyToPrice($dv['row'], (float)$product['price_product']);
             MiniDiscount::markSellUsed($discountCode, $this->user);
         }
 

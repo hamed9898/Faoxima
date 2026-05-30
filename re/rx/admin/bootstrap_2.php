@@ -390,7 +390,7 @@ if (in_array($text, $textadmin) || $datain == "admin") {
         }
     }
     return;
-} elseif ($text == $textbotlang['Admin']['channel']['title'] && $adminrulecheck['rule'] == "administrator") {
+} elseif (($text == $textbotlang['Admin']['channel']['title'] || $text == "➕ اضافه کردن کانال" || (isset($datain) && $datain == 'ch_add')) && $adminrulecheck['rule'] == "administrator") {
     nm_adminInstantReply($from_id, $textbotlang['Admin']['channel']['changechannel'], $backadmin, 'HTML');
     step('addchannel', $from_id);
 } elseif ($user['step'] == "addchannel") {
@@ -447,7 +447,7 @@ if (in_array($text, $textadmin) || $datain == "admin") {
             throw $e;
         }
     }
-} elseif ($text == $textbotlang['Admin']['channel']['removechannelbtn'] && $adminrulecheck['rule'] == "administrator") {
+} elseif (($text == $textbotlang['Admin']['channel']['removechannelbtn'] || $text == "❌ حذف کانال" || (isset($datain) && $datain == 'ch_del')) && $adminrulecheck['rule'] == "administrator") {
     nm_adminInstantReply($from_id, $textbotlang['Admin']['channel']['removechannel'], $list_channels_joins, 'HTML');
     step('removechannel', $from_id);
 } elseif ($user['step'] == "removechannel") {

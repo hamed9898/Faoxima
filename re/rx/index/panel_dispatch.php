@@ -621,18 +621,23 @@ if (preg_match('/^sendresidcart-(.*)/', $datain, $dataget)) {
         return;
     }
     $checklimit = select("Discount", "*", "code", $text, "select");
-    if ($checklimit['limitused'] >= $checklimit['limituse']) {
+    $__gstatus = strtolower(trim((string)($checklimit['status'] ?? '')));
+    if ($__gstatus !== '' && $__gstatus !== 'active') {
+        sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
+        return;
+    }
+    $__gtarget = trim((string)($checklimit['target_user'] ?? ''));
+    if ($__gtarget !== '' && $__gtarget !== (string)$from_id) {
+        sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
+        return;
+    }
+    $__gexp = intval($checklimit['expire_at'] ?? 0);
+    if ($__gexp !== 0 && time() >= $__gexp) {
         sendmessage($from_id, $textbotlang['users']['Discount']['erorrlimitdiscount'], $backuser, 'HTML');
         return;
     }
-    $stmt = $pdo->prepare("SELECT * FROM Giftcodeconsumed WHERE id_user = :from_id AND code = :code");
-    $stmt->bindParam(':from_id', $from_id, PDO::PARAM_STR);
-    $stmt->bindParam(':code', $text, PDO::PARAM_STR);
-    $stmt->execute();
-    $Checkcodesql = $stmt->rowCount();
-    if ($Checkcodesql != 0) {
-        sendmessage($from_id, $textbotlang['users']['Discount']['giftcodeonce'], $keyboard, 'HTML');
-        step('home', $from_id);
+    if (intval($checklimit['limituse']) > 0 && intval($checklimit['limitused']) >= intval($checklimit['limituse'])) {
+        sendmessage($from_id, $textbotlang['users']['Discount']['erorrlimitdiscount'], $backuser, 'HTML');
         return;
     }
     $stmt = $pdo->prepare("SELECT * FROM Discount WHERE code = :code LIMIT 1");

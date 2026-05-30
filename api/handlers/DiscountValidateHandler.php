@@ -17,8 +17,8 @@ final class DiscountValidateHandler extends BaseHandler
             FaoximaResponse::badRequest('code is required');
         }
 
-        $typeIn = FaoximaInput::string($this->data, 'context');
-        $type = in_array($typeIn, ['buy', 'extend'], true) ? $typeIn : 'all';
+        $ctxIn = FaoximaInput::string($this->data, 'context');
+        $section = in_array($ctxIn, ['buy', 'extend', 'volume', 'time', 'charge'], true) ? $ctxIn : 'all';
 
         $username = FaoximaInput::nullableString($this->data, 'username');
         $codeProduct = FaoximaInput::string($this->data, 'product_code');
@@ -37,21 +37,36 @@ final class DiscountValidateHandler extends BaseHandler
             }
         }
 
-        $result = MiniDiscount::validateSell($code, $type, $codeProduct, $codePanel, $this->user);
+        $result = MiniDiscount::validateSell($code, $section, $codeProduct, $codePanel, $this->user);
         if (empty($result['ok'])) {
             FaoximaResponse::fail(422, (string)($result['reason'] ?? '❌ کد تخفیف نامعتبر است.'));
         }
 
-        $percent = (int)$result['percent'];
+        $row = $result['row'];
         $base = FaoximaInput::int($this->data, 'base_price', 0);
-        $finalPrice = $base > 0 ? (int) round($base - (($base * $percent) / 100)) : null;
+        $finalPrice = $base > 0 ? (int) round(MiniDiscount::applyToPrice($row, (float)$base)) : null;
+
+        if ($section === 'charge') {
+            $message = $base > 0
+                ? "🤩 کد معتبر است؛ به‌جای " . number_format($base) . " تومان مبلغ " . number_format((int)$finalPrice) . " تومان پرداخت می‌کنید و همان " . number_format($base) . " تومان به کیف پول شما اضافه می‌شود."
+                : "🤩 کد تخفیف شارژ معتبر است ({$result['label']}).";
+            FaoximaResponse::ok([
+                'code'           => (string)$result['code'],
+                'value_type'     => (string)$result['value_type'],
+                'label'          => (string)$result['label'],
+                'credit_amount'  => $base > 0 ? $base : null,
+                'gateway_amount' => $finalPrice,
+                'message'        => $message,
+            ]);
+        }
 
         FaoximaResponse::ok([
             'code'        => (string)$result['code'],
-            'percent'     => $percent,
+            'value_type'  => (string)$result['value_type'],
+            'label'       => (string)$result['label'],
             'base_price'  => $base > 0 ? $base : null,
             'final_price' => $finalPrice,
-            'message'     => "🤩 کد تخفیف معتبر است؛ {$percent}٪ تخفیف اعمال می‌شود.",
+            'message'     => "🤩 کد تخفیف معتبر است؛ تخفیف {$result['label']} اعمال می‌شود.",
         ]);
     }
 }
