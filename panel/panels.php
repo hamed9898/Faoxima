@@ -204,7 +204,7 @@ function faoxima_http_get(string $url, array $headers = []): array {
 }
 
 
-function faoxima_test_panel_auth(string $url, string $username, string $password, string $apiKey, string $type): array {
+function faoxima_test_panel_auth(string $url, string $username, string $password, string $apiKey, string $type, string $xuiToken = ''): array {
 
     
     if ($type === 'Manualsale') {
@@ -214,6 +214,26 @@ function faoxima_test_panel_auth(string $url, string $username, string $password
 
     
     if (in_array($type, ['x-ui_single', 'alireza_single', 's_ui'], true)) {
+        if ($type === 'x-ui_single' && $xuiToken !== '') {
+            $rt = faoxima_http_get(
+                $url . '/panel/api/inbounds/list',
+                ['Authorization: Bearer ' . $xuiToken, 'Accept: application/json', 'X-Requested-With: XMLHttpRequest']
+            );
+            if (!$rt['ok']) {
+                return ['ok' => false, 'verified' => false, 'message' => 'اتصال ناموفق: ' . $rt['error']];
+            }
+            $jt = json_decode((string)$rt['body'], true);
+            if (is_array($jt) && array_key_exists('success', $jt)) {
+                if (filter_var($jt['success'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true) {
+                    return ['ok' => true, 'verified' => true, 'message' => 'توکن API معتبر است ✅ (حالت 3x-ui توکنی)'];
+                }
+                return ['ok' => true, 'verified' => false, 'message' => '❌ توکن API نامعتبر است (' . (string)($jt['msg'] ?? 'success=false') . ')'];
+            }
+            if ($rt['code'] === 401 || $rt['code'] === 403) {
+                return ['ok' => true, 'verified' => false, 'message' => '❌ توکن API نادرست (HTTP ' . $rt['code'] . ')'];
+            }
+            return ['ok' => true, 'verified' => false, 'message' => '❌ پاسخ نامعتبر برای توکن API (HTTP ' . $rt['code'] . ')'];
+        }
         if ($username === '' || $password === '') {
             return ['ok' => true, 'verified' => false, 'message' => 'یوزرنیم یا پسورد خالی است'];
         }
@@ -384,6 +404,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'test_auth') {
     $username = trim((string)($_POST['username'] ?? ''));
     $password =       (string)($_POST['password'] ?? '');
     $apiKey   = trim((string)($_POST['api_key']  ?? ''));
+    $xuiToken = trim((string)($_POST['xui_api_token'] ?? ''));
     $type     = trim((string)($_POST['type']     ?? 'marzban'));
 
     if ($type === 'Manualsale') {
@@ -413,7 +434,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'test_auth') {
         }
     }
 
-    $result = faoxima_test_panel_auth($url, $username, $password, $apiKey, $type);
+    if ($xuiToken === '' && !empty($_POST['panel_id'])) {
+        $pid = (int)$_POST['panel_id'];
+        if ($pid > 0) {
+            try {
+                $curT = $pdo->prepare("SELECT xui_api_token FROM marzban_panel WHERE id = :id LIMIT 1");
+                $curT->execute([':id' => $pid]);
+                $rowT = $curT->fetch(PDO::FETCH_ASSOC) ?: [];
+                $xuiToken = (string)($rowT['xui_api_token'] ?? '');
+            } catch (\Throwable $e) {}
+        }
+    }
+
+    $result = faoxima_test_panel_auth($url, $username, $password, $apiKey, $type, $xuiToken);
     echo json_encode($result);
     exit;
 }
@@ -721,6 +754,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $userPanel = trim((string)($_POST['username_panel'] ?? ''));
         $passPanel = (string)($_POST['password_panel']      ?? '');
         $apiKey    = trim((string)($_POST['api_key']        ?? ''));
+        $xuiToken  = trim((string)($_POST['xui_api_token']  ?? ''));
         $type      = trim((string)($_POST['type']           ?? 'marzban'));
         $agent     = (string)($_POST['agent']               ?? 'all');
 
@@ -773,9 +807,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
 
-            if ($userPanel === '' && $passPanel === '' && $apiKey === '') {
+            if ($userPanel === '' && $passPanel === '' && $apiKey === '' && $xuiToken === '') {
                 $errors[] = 'حداقل باید یوزرنیم و پسورد یا API key وارد شود.';
-            } elseif ($userPanel === '' && $apiKey === '') {
+            } elseif ($userPanel === '' && $apiKey === '' && $xuiToken === '') {
                 $errors[] = 'یوزرنیم خالی است — اگر فقط با API key احراز هویت می‌کنید، آن را وارد کنید.';
             }
         }
@@ -790,7 +824,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $testNote      = '';
 
             if ($type !== 'Manualsale') {
-                $auth = faoxima_test_panel_auth($urlPanel, $userPanel, $passPanel, $apiKey, $type);
+                $auth = faoxima_test_panel_auth($urlPanel, $userPanel, $passPanel, $apiKey, $type, $xuiToken);
 
 
                 error_log(sprintf(
@@ -852,8 +886,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $pdo->prepare(
                     "INSERT INTO marzban_panel
-                     (code_panel, name_panel, status, url_panel, username_panel, password_panel, api_key, type, agent)
-                     VALUES (:c, :n, :st, :u, :user, :pass, :api, :type, :agent)"
+                     (code_panel, name_panel, status, url_panel, username_panel, password_panel, api_key, xui_api_token, type, agent)
+                     VALUES (:c, :n, :st, :u, :user, :pass, :api, :xt, :type, :agent)"
                 );
                 $stmt->execute([
                     ':c'    => $codePanel,
@@ -863,6 +897,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':user' => $userPanel,
                     ':pass' => $passPanel,
                     ':api'  => $apiKey,
+                    ':xt'   => $xuiToken,
                     ':type' => $type,
                     ':agent'=> $agent,
                 ]);
@@ -887,6 +922,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $userPanel = trim((string)($_POST['username_panel'] ?? ''));
         $passPanel = (string)($_POST['password_panel']      ?? '');
         $apiKey    = trim((string)($_POST['api_key']        ?? ''));
+        $xuiToken  = trim((string)($_POST['xui_api_token']  ?? ''));
+        $xuiTokenClear = !empty($_POST['xui_api_token_clear']);
         $type      = trim((string)($_POST['type']           ?? 'marzban'));
         $agent     = (string)($_POST['agent']               ?? 'all');
         $status    = !empty($_POST['status']) ? 'active' : 'inactive';
@@ -970,7 +1007,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $skipTest = false;
                 $skipNote = '';
-                if ($passPanel === '' && $apiKey === '') {
+                if ($passPanel === '' && $apiKey === '' && $xuiToken === '' && !$xuiTokenClear) {
                     try {
                         $prevStmt = $pdo->prepare("SELECT status, url_panel, username_panel FROM marzban_panel WHERE id = :id");
                         $prevStmt->execute([':id' => $id]);
@@ -1020,13 +1057,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $effectivePass = $passPanel;
                 $effectiveKey  = $apiKey;
-                if ($effectivePass === '' || $effectiveKey === '') {
+                $effectiveToken = $xuiTokenClear ? '' : $xuiToken;
+                if ($effectivePass === '' || $effectiveKey === '' || ($effectiveToken === '' && !$xuiTokenClear)) {
                     try {
-                        $curStmt = $pdo->prepare("SELECT password_panel, api_key FROM marzban_panel WHERE id = :id");
+                        $curStmt = $pdo->prepare("SELECT password_panel, api_key, xui_api_token FROM marzban_panel WHERE id = :id");
                         $curStmt->execute([':id' => $id]);
                         $cur = $curStmt->fetch(PDO::FETCH_ASSOC) ?: [];
                         if ($effectivePass === '') $effectivePass = (string)($cur['password_panel'] ?? '');
                         if ($effectiveKey  === '') $effectiveKey  = (string)($cur['api_key']        ?? '');
+                        if ($effectiveToken === '' && !$xuiTokenClear) $effectiveToken = (string)($cur['xui_api_token'] ?? '');
                     } catch (\Throwable $e) {  }
                 }
 
@@ -1041,7 +1080,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'key_source'       => $apiKey   !== '' ? 'form' : 'db',
                 ]);
 
-                $auth = faoxima_test_panel_auth($urlPanel, $userPanel, $effectivePass, $effectiveKey, $type);
+                $auth = faoxima_test_panel_auth($urlPanel, $userPanel, $effectivePass, $effectiveKey, $type, $effectiveToken);
 
 
                 error_log(sprintf(
@@ -1123,6 +1162,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$authFailed) {
                     if ($passPanel !== '') { $sets[] = "password_panel = :pass"; $params[':pass'] = $passPanel; }
                     if ($apiKey    !== '') { $sets[] = "api_key = :api";          $params[':api']  = $apiKey;    }
+                }
+                if ($xuiTokenClear) {
+                    $sets[] = "xui_api_token = :xt"; $params[':xt'] = '';
+                } elseif ($xuiToken !== '') {
+                    $sets[] = "xui_api_token = :xt"; $params[':xt'] = $xuiToken;
                 }
                 if ($valUsertest    !== null && $valUsertest    !== '') { $sets[] = "val_usertest = :vu";    $params[':vu']  = $valUsertest; }
                 if ($timeUsertest   !== null && $timeUsertest   !== '') { $sets[] = "time_usertest = :tu";   $params[':tu']  = $timeUsertest; }
@@ -1427,6 +1471,12 @@ function faoxima_is_truthy_panel_flag($v, $trueValues) {
                                         <span class="info-line__k">API Key:</span>
                                         <span class="info-line__v"><?php echo faoxima_mask_secret($p['api_key'] ?? ''); ?></span>
                                     </div>
+                                    <?php if ($type === 'x-ui_single' && trim((string)($p['xui_api_token'] ?? '')) !== ''): ?>
+                                    <div class="info-line">
+                                        <span class="info-line__k">توکن 3x-ui:</span>
+                                        <span class="info-line__v"><?php echo faoxima_mask_secret($p['xui_api_token'] ?? ''); ?> <small style="color:var(--success,#16a34a)">(حالت توکنی فعال)</small></span>
+                                    </div>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <div class="info-line" style="color:var(--text-muted); font-style:italic;">پنل فروش دستی — بدون اتصال API. کانفیگ‌ها به‌صورت دستی از انبار خارج می‌شوند.</div>
                                 <?php endif; ?>
@@ -1672,6 +1722,11 @@ function faoxima_is_truthy_panel_flag($v, $trueValues) {
                 <label class="form-label">API Key (اختیاری)</label>
                 <input type="text" name="api_key" class="form-control" style="direction:ltr" autocomplete="off">
             </div>
+            <div class="form-group" id="addXuiTokenGroup" style="display:none">
+                <label class="form-label">توکن API پنل 3x-ui (صنایی نسخه جدید)</label>
+                <input type="text" name="xui_api_token" id="xui_api_token" class="form-control" style="direction:ltr" autocomplete="off" placeholder="Settings → Telegram/Subscription → API token">
+                <small style="opacity:.75">برای نسخه‌های جدید 3x-ui که با یوزرنیم/پسورد کار نمی‌کنند، توکن API را اینجا وارد کنید. در این حالت ربات از مسیر <code>/panel/api/clients/*</code> استفاده می‌کند.</small>
+            </div>
             <div class="form-group">
                 <label class="form-label">گروه کاربری</label>
                 <select name="agent" class="form-control">
@@ -1740,6 +1795,14 @@ function faoxima_is_truthy_panel_flag($v, $trueValues) {
             <div class="form-group">
                 <label class="form-label">API Key جدید <small style="color:var(--text-muted)">(خالی = بدون تغییر)</small></label>
                 <input type="text" name="api_key" class="form-control" style="direction:ltr" autocomplete="off" placeholder="برای تغییر API key، اینجا تایپ کنید">
+            </div>
+            <div class="form-group" id="edit_xui_token_group" style="display:none">
+                <label class="form-label">توکن API پنل 3x-ui (صنایی نسخه جدید) <small style="color:var(--text-muted)">(خالی = بدون تغییر)</small></label>
+                <input type="text" name="xui_api_token" id="edit_xui_api_token" class="form-control" style="direction:ltr" autocomplete="off" placeholder="برای تغییر توکن، اینجا تایپ کنید">
+                <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px;">
+                    <input type="checkbox" name="xui_api_token_clear" value="1"> حذف توکن و بازگشت به حالت یوزرنیم/پسورد
+                </label>
+                <small style="opacity:.75">با تنظیم توکن، ربات برای این پنل از API توکنی 3x-ui (مسیر <code>/panel/api/clients/*</code>) استفاده می‌کند.</small>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -1879,6 +1942,8 @@ function toggleUrlField(type) {
     document.getElementById('addUrlGroup').style.display    = hide ? 'none' : '';
     document.getElementById('addCredsGroup').style.display  = hide ? 'none' : '';
     document.getElementById('addApiGroup').style.display    = hide ? 'none' : '';
+    var xt = document.getElementById('addXuiTokenGroup');
+    if (xt) xt.style.display = (type === 'x-ui_single') ? '' : 'none';
     var u = document.getElementById('addUrlInput');
     if (u) u.required = !hide;
 }
@@ -1897,6 +1962,7 @@ function testPanelAuth(mode) {
     var username = (document.getElementById(prefix + 'username_panel') || {}).value || '';
     var password = (document.getElementById(prefix + 'password_panel') || {}).value || '';
     var apiKey   = (document.getElementById(prefix + 'api_key')        || {}).value || '';
+    var xuiToken = (document.getElementById(prefix + 'xui_api_token')  || {}).value || '';
     var type     = (document.getElementById(prefix + 'type')           || {}).value || 'marzban';
     var panelId  = mode === 'edit' ? ((document.getElementById('edit_id') || {}).value || '') : '';
 
@@ -1924,6 +1990,7 @@ function testPanelAuth(mode) {
     fd.append('username', username);
     fd.append('password', password);
     fd.append('api_key',  apiKey);
+    fd.append('xui_api_token', xuiToken);
     fd.append('type',     type);
     if (panelId) fd.append('panel_id', panelId);
 
@@ -2035,6 +2102,9 @@ function openEdit(d) {
     setIfExists('edit_linksubx',        d.linksubx);
     setIfExists('edit_secret_code',     d.secret_code);
     setIfExists('edit_namecustom',      d.namecustom);
+    setIfExists('edit_xui_api_token',   '');
+    var xtClear = document.querySelector('#edit_xui_token_group input[name="xui_api_token_clear"]');
+    if (xtClear) xtClear.checked = false;
 
     // نمایش/مخفی فیلدهای پیشرفته بر اساس نوع پنل
     applyAdvancedFieldsVisibility(d.type || 'marzban');
@@ -2094,10 +2164,12 @@ function applyAdvancedFieldsVisibility(type) {
     var grpInbound    = document.getElementById('edit_inboundid_group');
     var grpSublink    = document.getElementById('edit_linksubx_group');
     var grpSecretCode = document.getElementById('edit_secret_code_group');
+    var grpXuiToken   = document.getElementById('edit_xui_token_group');
 
     if (grpInbound)    grpInbound.style.display    = needsInbound    ? '' : 'none';
     if (grpSublink)    grpSublink.style.display    = needsSublink    ? '' : 'none';
     if (grpSecretCode) grpSecretCode.style.display = needsSecretCode ? '' : 'none';
+    if (grpXuiToken)   grpXuiToken.style.display   = (type === 'x-ui_single') ? '' : 'none';
 }
 
 // نمایش فیلد "متن پیشوند" وقتی MethodUsername از نوع "متن دلخواه" باشد
