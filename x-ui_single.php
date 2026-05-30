@@ -4,6 +4,122 @@ require_once 'request.php';
 ini_set('error_log', 'error_log');
 
 
+/**
+ * 3x-ui (MHSanaei) API-token mode helpers.
+ *
+ * Modern 3x-ui (>= v3.1.0, the "multi inbound clients" rework) moved client
+ * CRUD from /panel/api/inbounds/* to /panel/api/clients/* and enforces a CSRF
+ * token on every cookie-authenticated POST. Cookie login therefore can no
+ * longer create/update/delete clients on those panels. The supported path is
+ * an API token (Settings -> generate token) sent as a Bearer header, which
+ * bypasses CSRF and reaches the new client endpoints.
+ *
+ * When a panel row has a non-empty `xui_api_token`, every x-ui_single call uses
+ * this token mode and the new endpoints. When it is empty the legacy cookie
+ * behaviour is used unchanged, so existing older panels keep working.
+ */
+if (!function_exists('xui_panel_uses_token')) {
+    function xui_panel_uses_token($panel)
+    {
+        return is_array($panel)
+            && isset($panel['xui_api_token'])
+            && trim((string) $panel['xui_api_token']) !== '';
+    }
+}
+
+if (!function_exists('xui_panel_token')) {
+    function xui_panel_token($panel)
+    {
+        return trim((string) ($panel['xui_api_token'] ?? ''));
+    }
+}
+
+if (!function_exists('xui_api_token_request')) {
+    /**
+     * Perform an authenticated request against a modern 3x-ui panel using its
+     * API token. Returns the raw CurlRequest result (status/body/error) and, on
+     * a {"success":false} body, sets ['error'] so callers can treat it like the
+     * legacy error shape.
+     */
+    function xui_api_token_request($panel, $method, $path, $jsonBody = null, $timeout = 8)
+    {
+        $base = rtrim((string) ($panel['url_panel'] ?? ''), '/');
+        $req = new CurlRequest($base . $path);
+        $req->setTimeout($timeout);
+        $req->setBearerToken(xui_panel_token($panel));
+        $headers = array('Accept: application/json', 'X-Requested-With: XMLHttpRequest');
+        if ($jsonBody !== null) {
+            $headers[] = 'Content-Type: application/json';
+        }
+        $req->setHeaders($headers);
+
+        $method = strtoupper($method);
+        if ($method === 'GET') {
+            $resp = $req->get();
+        } else {
+            $payload = $jsonBody === null
+                ? ''
+                : (is_string($jsonBody) ? $jsonBody : json_encode($jsonBody));
+            $resp = $req->post($payload);
+        }
+
+        if (isset($resp['body']) && is_string($resp['body'])) {
+            $decoded = json_decode($resp['body'], true);
+            if (is_array($decoded) && array_key_exists('success', $decoded) && $decoded['success'] === false) {
+                $resp['error'] = $decoded['msg'] ?? 'Unknown panel error';
+            }
+        }
+
+        return $resp;
+    }
+}
+
+if (!function_exists('xui_token_single_link')) {
+    /**
+     * Fetch a client's connection links directly from a modern 3x-ui panel via
+     * the token API (/panel/api/clients/links/{email}). Returns the first
+     * vless/vmess/trojan link or null.
+     */
+    function xui_token_single_link($panel, $email)
+    {
+        if (!xui_panel_uses_token($panel) || $email === null || $email === '') {
+            return null;
+        }
+        $resp = xui_api_token_request($panel, 'GET', '/panel/api/clients/links/' . rawurlencode($email), null, 6);
+        if (empty($resp['body'])) {
+            return null;
+        }
+        $decoded = json_decode($resp['body'], true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $obj = $decoded['obj'] ?? $decoded;
+        $candidates = array();
+        if (is_string($obj)) {
+            $candidates = preg_split('/\R/', trim($obj)) ?: array();
+        } elseif (is_array($obj)) {
+            foreach ($obj as $item) {
+                if (is_string($item)) {
+                    $candidates[] = $item;
+                } elseif (is_array($item)) {
+                    foreach (array('uri', 'link', 'url') as $k) {
+                        if (!empty($item[$k]) && is_string($item[$k])) {
+                            $candidates[] = $item[$k];
+                        }
+                    }
+                }
+            }
+        }
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '' && preg_match('/^(vless|vmess|trojan):\/\//i', $candidate)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+}
+
 if (!function_exists('xuisingle_cookie_path')) {
     function xuisingle_cookie_path() {
         static $path = null;
@@ -357,6 +473,15 @@ function get_single_link_smart($panelBase, $inboundId, $subscriptionUrl, $userna
     if (!empty($result['links'])) {
         return $result['links'][0];
     }
+    if ($panelName) {
+        $panelRowForToken = select("marzban_panel", "*", "name_panel", $panelName, "select");
+        if (xui_panel_uses_token($panelRowForToken)) {
+            $tokenLink = xui_token_single_link($panelRowForToken, $username);
+            if ($tokenLink) {
+                return $tokenLink;
+            }
+        }
+    }
     $fallback = fallback_single_link_from_clients_api($username, $panelName);
     if ($fallback) {
         return $fallback;
@@ -393,6 +518,13 @@ function get_single_link_after_create($panelBase, $inboundId, $subscriptionUrl, 
 function get_clinets($username, $namepanel)
 {
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $namepanel, "select");
+    if (xui_panel_uses_token($marzban_list_get)) {
+        return xui_api_token_request(
+            $marzban_list_get,
+            'GET',
+            '/panel/api/clients/traffic/' . rawurlencode($username)
+        );
+    }
     login($marzban_list_get['code_panel']);
     $base = rtrim($marzban_list_get['url_panel'], '/');
     $url = $base . "/panel/api/inbounds/getClientTraffics/$username";
@@ -447,7 +579,9 @@ function get_clinets($username, $namepanel)
 function addClient($namepanel, $usernameac, $Expire, $Total, $Uuid, $Flow, $subid, $inboundid, $name_product, $note = "")
 {
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $namepanel, "select");
-    login($marzban_list_get['code_panel']);
+    if (!xui_panel_uses_token($marzban_list_get)) {
+        login($marzban_list_get['code_panel']);
+    }
     if ($name_product == "usertest") {
         if ($marzban_list_get['on_hold_test'] == "1") {
             if ($Expire == 0) {
@@ -470,6 +604,35 @@ function addClient($namepanel, $usernameac, $Expire, $Total, $Uuid, $Flow, $subi
         } else {
             $timeservice = $Expire * 1000;
         }
+    }
+    if (xui_panel_uses_token($marzban_list_get)) {
+        $client = array(
+            "id" => $Uuid,
+            "email" => $usernameac,
+            "totalGB" => $Total,
+            "expiryTime" => $timeservice,
+            "enable" => true,
+            "tgId" => "",
+            "subId" => $subid,
+            "limitIp" => 0,
+            "reset" => 0,
+            "comment" => $note,
+        );
+        if ($Flow !== "" && $Flow !== null) {
+            $client["flow"] = $Flow;
+        }
+        if (!isset($usernameac)) {
+            return array('status' => 500, 'msg' => 'username is null');
+        }
+        return xui_api_token_request(
+            $marzban_list_get,
+            'POST',
+            '/panel/api/clients/add',
+            array(
+                'client' => $client,
+                'inboundIds' => array(intval($inboundid)),
+            )
+        );
     }
     $config = array(
         "id" => intval($inboundid),
@@ -513,6 +676,28 @@ function addClient($namepanel, $usernameac, $Expire, $Total, $Uuid, $Flow, $subi
 function updateClient($namepanel, $uuid, array $config)
 {
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $namepanel, "select");
+    if (xui_panel_uses_token($marzban_list_get)) {
+        $settings = $config['settings'] ?? array();
+        if (is_string($settings)) {
+            $settings = json_decode($settings, true);
+        }
+        $client = is_array($settings) && isset($settings['clients'][0]) ? $settings['clients'][0] : null;
+        if (!is_array($client) || empty($client['email'])) {
+            return array(
+                'status' => 500,
+                'body' => json_encode(array('success' => false, 'msg' => 'client email missing')),
+            );
+        }
+        if (isset($client['flow']) && $client['flow'] === '') {
+            unset($client['flow']);
+        }
+        return xui_api_token_request(
+            $marzban_list_get,
+            'POST',
+            '/panel/api/clients/update/' . rawurlencode($client['email']),
+            $client
+        );
+    }
     login($marzban_list_get['code_panel']);
     $configpanel = json_encode($config, true);
     $url = $marzban_list_get['url_panel'] . '/panel/api/inbounds/updateClient/' . $uuid;
@@ -529,6 +714,14 @@ function updateClient($namepanel, $uuid, array $config)
 }
 function ResetUserDataUsagex_uisin($usernamepanel, $namepanel)
 {
+    $panel_token_row = select("marzban_panel", "*", "name_panel", $namepanel, "select");
+    if (xui_panel_uses_token($panel_token_row)) {
+        return xui_api_token_request(
+            $panel_token_row,
+            'POST',
+            '/panel/api/clients/resetTraffic/' . rawurlencode($usernamepanel)
+        );
+    }
     $data_user = get_clinets($usernamepanel, $namepanel);
     $data_user = json_decode($data_user['body'], true)['obj'];
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $namepanel, "select");
@@ -548,6 +741,13 @@ function ResetUserDataUsagex_uisin($usernamepanel, $namepanel)
 function removeClient($location, $username)
 {
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+    if (xui_panel_uses_token($marzban_list_get)) {
+        return xui_api_token_request(
+            $marzban_list_get,
+            'POST',
+            '/panel/api/clients/del/' . rawurlencode($username)
+        );
+    }
     login($marzban_list_get['code_panel']);
     $url = $marzban_list_get['url_panel'] . "/panel/api/inbounds/{$marzban_list_get['inboundid']}/delClientByEmail/" . $username;
     $headers = array(

@@ -469,6 +469,7 @@ try {
         username_panel varchar(200) NULL,
         password_panel varchar(200) NULL,
         api_key varchar(500) NULL,
+        xui_api_token varchar(1000) NULL,
         agent varchar(200) NULL,
         sublink varchar(500) NULL,
         config varchar(500) NULL,
@@ -545,6 +546,7 @@ try {
         addFieldToTable("marzban_panel", "proxies", null, "TEXT");
         addFieldToTable("marzban_panel", "inbounds", null, "TEXT");
         addFieldToTable("marzban_panel", "api_key", null, "VARCHAR(500)");
+        addFieldToTable("marzban_panel", "xui_api_token", null, "VARCHAR(1000)");
         addFieldToTable("marzban_panel", "customvolume", $VALUE, "TEXT");
         addFieldToTable("marzban_panel", "subvip", "offsubvip", "VARCHAR(60)");
         addFieldToTable("marzban_panel", "changeloc", "offchangeloc", "VARCHAR(60)");
