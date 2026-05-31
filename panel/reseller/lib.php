@@ -373,3 +373,242 @@ if (!function_exists('reseller_count_active_services')) {
         return (int) $stmt->fetchColumn();
     }
 }
+
+/* --------------------------------------------------------------------------
+ * Reseller-bot customers (Phase 4): per-reseller customer wallets
+ * ------------------------------------------------------------------------ */
+
+if (!function_exists('reseller_customer_get')) {
+    /** Fetch (and lazily create) a customer row for a reseller's bot. */
+    function reseller_customer_get($resellerId, $chatId, $firstName = '', $username = '')
+    {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!($pdo instanceof PDO)) {
+            return null;
+        }
+        $resellerId = (int) $resellerId;
+        $chatId = (int) $chatId;
+        $sel = $pdo->prepare("SELECT * FROM reseller_customer WHERE reseller_id = :r AND chat_id = :c LIMIT 1");
+        $sel->execute([':r' => $resellerId, ':c' => $chatId]);
+        $row = $sel->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $pdo->prepare("UPDATE reseller_customer SET last_seen = :ts, first_name = :fn, username = :un WHERE id = :id")
+                ->execute([':ts' => (string) time(), ':fn' => mb_substr((string) $firstName, 0, 190), ':un' => mb_substr((string) $username, 0, 190), ':id' => (int) $row['id']]);
+            return $row;
+        }
+        $ins = $pdo->prepare(
+            "INSERT INTO reseller_customer (reseller_id, chat_id, first_name, username, balance, step, created_at, last_seen)
+             VALUES (:r, :c, :fn, :un, 0, '', :ts, :ts)"
+        );
+        $ins->execute([':r' => $resellerId, ':c' => $chatId, ':fn' => mb_substr((string) $firstName, 0, 190), ':un' => mb_substr((string) $username, 0, 190), ':ts' => (string) time()]);
+        $sel->execute([':r' => $resellerId, ':c' => $chatId]);
+        return $sel->fetch(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('reseller_customer_set_step')) {
+    function reseller_customer_set_step($customerId, $step, $stepData = '')
+    {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!($pdo instanceof PDO)) {
+            return;
+        }
+        $pdo->prepare("UPDATE reseller_customer SET step = :s, step_data = :d WHERE id = :id")
+            ->execute([':s' => (string) $step, ':d' => (string) $stepData, ':id' => (int) $customerId]);
+    }
+}
+
+if (!function_exists('reseller_customer_wallet_apply')) {
+    /**
+     * Atomically change a customer's wallet (with a given reseller).
+     * @return array ['ok'=>bool,'balance'=>int,'msg'=>string]
+     */
+    function reseller_customer_wallet_apply($customerId, $amount, $allowNegative = false)
+    {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!($pdo instanceof PDO)) {
+            return ['ok' => false, 'balance' => 0, 'msg' => 'no database'];
+        }
+        $customerId = (int) $customerId;
+        $amount = (int) round((float) $amount);
+        try {
+            $pdo->beginTransaction();
+            $sel = $pdo->prepare("SELECT balance FROM reseller_customer WHERE id = :id FOR UPDATE");
+            $sel->execute([':id' => $customerId]);
+            $cur = $sel->fetchColumn();
+            if ($cur === false) {
+                $pdo->rollBack();
+                return ['ok' => false, 'balance' => 0, 'msg' => 'customer not found'];
+            }
+            $cur = (int) $cur;
+            $new = $cur + $amount;
+            if ($new < 0 && !$allowNegative) {
+                $pdo->rollBack();
+                return ['ok' => false, 'balance' => $cur, 'msg' => 'موجودی کافی نیست'];
+            }
+            $pdo->prepare("UPDATE reseller_customer SET balance = :b WHERE id = :id")
+                ->execute([':b' => $new, ':id' => $customerId]);
+            $pdo->commit();
+            return ['ok' => true, 'balance' => $new, 'msg' => ''];
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('[reseller_customer_wallet_apply] ' . $e->getMessage());
+            return ['ok' => false, 'balance' => 0, 'msg' => 'خطای پایگاه داده'];
+        }
+    }
+}
+
+if (!function_exists('reseller_sell_price')) {
+    /**
+     * Customer-facing price for a product sold by a reseller's bot.
+     * Falls back to the product's normal price when the reseller set none.
+     */
+    function reseller_sell_price($resellerId, array $product)
+    {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if ($pdo instanceof PDO) {
+            $stmt = $pdo->prepare("SELECT sell_price FROM reseller_product_sell WHERE reseller_id = :r AND product_code = :c LIMIT 1");
+            $stmt->execute([':r' => (int) $resellerId, ':c' => (string) ($product['code_product'] ?? '')]);
+            $v = $stmt->fetchColumn();
+            if ($v !== false && (int) $v > 0) {
+                return (int) $v;
+            }
+        }
+        return (int) round((float) ($product['price_product'] ?? 0));
+    }
+}
+
+if (!function_exists('reseller_find_product')) {
+    /** Find an allowed product for a reseller by its code_product. */
+    function reseller_find_product(array $reseller, $code)
+    {
+        foreach (reseller_allowed_products($reseller) as $p) {
+            if ((string) ($p['code_product'] ?? '') === (string) $code) {
+                return $p;
+            }
+        }
+        return null;
+    }
+}
+
+if (!function_exists('reseller_available_panels')) {
+    /** Names of enabled panels usable for "/all" location products. */
+    function reseller_available_panels()
+    {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!($pdo instanceof PDO)) {
+            return [];
+        }
+        $rows = $pdo->query("SELECT name_panel FROM marzban_panel ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+        return array_values(array_filter(array_map(static function ($p) {
+            return (string) ($p['name_panel'] ?? '');
+        }, $rows), static function ($n) {
+            return $n !== '';
+        }));
+    }
+}
+
+if (!function_exists('reseller_resolve_panel')) {
+    /** Resolve the destination panel for a product (its Location, or a chosen one). */
+    function reseller_resolve_panel(array $product, $panelChoice = '')
+    {
+        $loc = trim((string) ($product['Location'] ?? ''));
+        if ($loc !== '' && $loc !== '/all') {
+            return $loc;
+        }
+        $panels = reseller_available_panels();
+        if ($panelChoice !== '' && in_array($panelChoice, $panels, true)) {
+            return $panelChoice;
+        }
+        if (count($panels) === 1) {
+            return $panels[0];
+        }
+        return '';
+    }
+}
+
+if (!function_exists('reseller_provision_service')) {
+    /**
+     * Provision a VPN service on a panel and record it in reseller_service.
+     * Wallet charging is intentionally left to the caller (panel vs. bot flows
+     * have different financial models). Requires a loaded ManagePanel instance.
+     *
+     * @return array ['ok'=>bool,'msg'=>string,'sub_token'=>string,'sub_link'=>string,'service_id'=>int]
+     */
+    function reseller_provision_service(array $reseller, array $product, $panelName, $usernameC, $ManagePanel, array $opts = [])
+    {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!($pdo instanceof PDO)) {
+            return ['ok' => false, 'msg' => 'no database'];
+        }
+        $rid = (int) $reseller['id'];
+        $usernameC = preg_replace('/[^A-Za-z0-9_]/', '', (string) $usernameC);
+        if (strlen($usernameC) < 3) {
+            return ['ok' => false, 'msg' => 'نام کاربری باید حداقل ۳ کاراکتر انگلیسی باشد.'];
+        }
+
+        $days = (int) ($product['Service_time'] ?? 0);
+        $volumeGb = (float) ($product['Volume_constraint'] ?? 0);
+        $expire = $days > 0 ? strtotime('+' . $days . ' days') : 0;
+        $dataLimit = $volumeGb > 0 ? (int) round($volumeGb * pow(1024, 3)) : 0;
+
+        $datac = [
+            'expire'     => $expire,
+            'data_limit' => $dataLimit,
+            'from_id'    => 'reseller:' . $rid,
+            'username'   => (string) $reseller['username'],
+            'type'       => 'reseller',
+        ];
+
+        try {
+            $out = $ManagePanel->createUser($panelName, (string) $product['code_product'], $usernameC, $datac);
+        } catch (\Throwable $e) {
+            error_log('[reseller_provision_service] createUser: ' . $e->getMessage());
+            $out = ['status' => 'Unsuccessful', 'msg' => 'خطای داخلی در ساخت سرویس'];
+        }
+
+        if (!is_array($out) || empty($out['username']) || (($out['status'] ?? '') !== 'successful' && empty($out['subscription_url']))) {
+            $msg = is_array($out) && isset($out['msg'])
+                ? (is_string($out['msg']) ? $out['msg'] : json_encode($out['msg'], JSON_UNESCAPED_UNICODE))
+                : 'نامشخص';
+            return ['ok' => false, 'msg' => 'ساخت سرویس در پنل ناموفق بود: ' . $msg];
+        }
+
+        $subToken = bin2hex(random_bytes(16));
+        $configs = $out['configs'] ?? [];
+        $ins = $pdo->prepare(
+            "INSERT INTO reseller_service
+                (reseller_id, product_code, panel_name, username, uuid, sub_token, sub_link, customer_name, customer_chat_id, volume_gb, days, price, sell_price, sold_via, status, created_at, expire_at)
+             VALUES
+                (:rid, :code, :panel, :uname, :uuid, :tok, :sub, :cname, :cchat, :vol, :days, :price, :sell, :sold, 'active', :ts, :exp)"
+        );
+        $ins->execute([
+            ':rid'   => $rid,
+            ':code'  => (string) $product['code_product'],
+            ':panel' => (string) $panelName,
+            ':uname' => (string) $out['username'],
+            ':uuid'  => is_array($configs) ? json_encode($configs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (string) $configs,
+            ':tok'   => $subToken,
+            ':sub'   => (string) ($out['subscription_url'] ?? ''),
+            ':cname' => mb_substr((string) ($opts['customer_name'] ?? ''), 0, 190),
+            ':cchat' => preg_replace('/[^0-9]/', '', (string) ($opts['customer_chat'] ?? '')),
+            ':vol'   => (string) $volumeGb,
+            ':days'  => (string) $days,
+            ':price' => (int) round((float) ($opts['price'] ?? reseller_product_price($product))),
+            ':sell'  => (string) (int) round((float) ($opts['sell_price'] ?? 0)),
+            ':sold'  => (string) ($opts['sold_via'] ?? 'panel'),
+            ':ts'    => (string) time(),
+            ':exp'   => $expire > 0 ? (string) $expire : '',
+        ]);
+
+        return [
+            'ok'         => true,
+            'msg'        => '',
+            'sub_token'  => $subToken,
+            'sub_link'   => (string) ($out['subscription_url'] ?? ''),
+            'service_id' => (int) $pdo->lastInsertId(),
+        ];
+    }
+}

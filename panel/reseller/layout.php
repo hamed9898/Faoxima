@@ -19,6 +19,8 @@ if (!function_exists('reseller_nav_items')) {
             'new'      => ['icon' => 'cart-shopping', 'label' => 'ساخت سرویس',     'file' => 'service_new.php'],
             'reports'  => ['icon' => 'chart-line',    'label' => 'حسابداری',       'file' => 'reports.php'],
             'withdraw' => ['icon' => 'coins',         'label' => 'برداشت وجه',     'file' => 'withdraw.php'],
+            'bot'      => ['icon' => 'robot',          'label' => 'ربات فروش',      'file' => 'bot_settings.php'],
+            'pricing'  => ['icon' => 'money-bill',     'label' => 'قیمت فروش',      'file' => 'pricing.php'],
         ];
     }
 }
