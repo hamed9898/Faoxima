@@ -44,9 +44,11 @@ alert('محصول از قبل وجود دارد'); window.location.href='product
     $agentProduct    = $_POST['agent_product']    ?? '';
     $category        = $_POST['cetegory_product'] ?? '';
     $note            = $_POST['note_product']     ?? '';
+    $resellerStatus  = !empty($_POST['reseller_status']) ? '1' : '0';
+    $resellerPrice   = preg_replace('/[^0-9]/', '', (string) ($_POST['reseller_price'] ?? ''));
     $dataLimitReset  = $userdata['data_limit_reset'];
 
-    $stmt = $pdo->prepare("INSERT IGNORE INTO product (name_product,code_product,price_product,Volume_constraint,Service_time,Location,agent,data_limit_reset,note,category,hide_panel,one_buy_status) VALUES (:name_product,:code_product,:price_product,:Volume_constraint,:Service_time,:Location,:agent,:data_limit_reset,:note,:category,:hide_panel,'0')");
+    $stmt = $pdo->prepare("INSERT IGNORE INTO product (name_product,code_product,price_product,Volume_constraint,Service_time,Location,agent,data_limit_reset,note,category,hide_panel,one_buy_status,reseller_status,reseller_price) VALUES (:name_product,:code_product,:price_product,:Volume_constraint,:Service_time,:Location,:agent,:data_limit_reset,:note,:category,:hide_panel,'0',:reseller_status,:reseller_price)");
     $stmt->bindParam(':name_product',     $nameProduct, PDO::PARAM_STR);
     $stmt->bindParam(':code_product',     $randomString);
     $stmt->bindParam(':price_product',    $priceProduct, PDO::PARAM_STR);
@@ -58,6 +60,8 @@ alert('محصول از قبل وجود دارد'); window.location.href='product
     $stmt->bindParam(':category',         $category, PDO::PARAM_STR);
     $stmt->bindParam(':note',             $note, PDO::PARAM_STR);
     $stmt->bindParam(':hide_panel',       $hidepanel);
+    $stmt->bindParam(':reseller_status',   $resellerStatus, PDO::PARAM_STR);
+    $stmt->bindParam(':reseller_price',    $resellerPrice, PDO::PARAM_STR);
     $stmt->execute();
 
     header("Location: product.php");
@@ -232,6 +236,18 @@ if (isset($_GET['removeid']) && $_GET['removeid'] !== '') {
             <div class="form-group">
                 <label class="form-label">توضیحات</label>
                 <input type="text" name="note_product" class="form-control" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" name="reseller_status" value="1"> قابل فروش توسط نمایندگان
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">قیمت نماینده (خالی = قیمت عادی)</label>
+                    <input type="number" name="reseller_price" class="form-control" placeholder="اختیاری">
+                </div>
             </div>
 
             <button type="submit" class="btn btn-primary btn-block">افزودن محصول</button>

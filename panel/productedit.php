@@ -82,6 +82,16 @@ if ($product == false) {
             update("product", "note", $note, "id", $id_product);
         }
 
+        $resellerStatus = !empty($_POST['reseller_status']) ? '1' : '0';
+        if (($product['reseller_status'] ?? '0') != $resellerStatus) {
+            update("product", "reseller_status", $resellerStatus, "id", $id_product);
+        }
+
+        $resellerPrice = preg_replace('/[^0-9]/', '', (string) ($_POST['reseller_price'] ?? ''));
+        if (($product['reseller_price'] ?? '') != $resellerPrice) {
+            update("product", "reseller_price", $resellerPrice, "id", $id_product);
+        }
+
         if (!$statusmessage) {
             header('Location: product.php');
             exit;
@@ -196,6 +206,18 @@ if ($product == false) {
                     <div class="form-group">
                         <label class="form-label">یادداشت</label>
                         <textarea name="note" class="form-control" rows="3"><?php echo htmlspecialchars($product['note'], ENT_QUOTES, 'UTF-8'); ?></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" name="reseller_status" value="1" <?php echo ((string) ($product['reseller_status'] ?? '0') === '1') ? 'checked' : ''; ?>> قابل فروش توسط نمایندگان
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">قیمت نماینده (خالی = قیمت عادی)</label>
+                            <input type="number" name="reseller_price" class="form-control" value="<?php echo htmlspecialchars((string) ($product['reseller_price'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" placeholder="اختیاری">
+                        </div>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-block">

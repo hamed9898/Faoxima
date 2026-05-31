@@ -185,6 +185,7 @@ if (is_file($__schemaLib) && is_readable($__schemaLib)) {
     <ul class="sidebar-menu">
         <li><a href="panels.php"><span class="menu-symbol"><?php echo icon('server', 'svg-icon svg-sm'); ?></span><span>مدیریت پنل‌ها</span></a></li>
         <li><a href="stock.php"><span class="menu-symbol"><?php echo icon('package', 'svg-icon svg-sm'); ?></span><span>انبار شبکه ملی</span></a></li>
+        <li><a href="resellers.php"><span class="menu-symbol"><?php echo icon('user-tag', 'svg-icon svg-sm'); ?></span><span>نمایندگان</span></a></li>
         <li><a href="finance.php"><span class="menu-symbol"><?php echo icon('money-bill', 'svg-icon svg-md'); ?></span><span>تنظیمات مالی</span></a></li>
         <li><a href="discounts.php"><span class="menu-symbol"><?php echo icon('ticket', 'svg-icon svg-sm'); ?></span><span>کدهای تخفیف</span></a></li>
         <li><a href="broadcast.php"><span class="menu-symbol"><?php echo icon('megaphone', 'svg-icon svg-sm'); ?></span><span>پیام همگانی</span></a></li>

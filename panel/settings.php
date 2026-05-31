@@ -82,6 +82,16 @@ $SETTING_GROUPS = [
         ],
     ],
 
+    'reseller' => [
+        'title' => 'پنل نمایندگان (فروشندگان)',
+        'icon'  => 'user-tag',
+        'fields' => [
+            ['type' => 'toggle', 'col' => 'reseller_system_status', 'label' => 'فعال‌سازی سیستم نمایندگان', 'on' => '1', 'off' => '0'],
+            ['type' => 'toggle', 'col' => 'reseller_signup_status', 'label' => 'اجازه ثبت‌نام خودکار نماینده', 'on' => '1', 'off' => '0'],
+            ['type' => 'number', 'col' => 'reseller_min_withdraw',  'label' => 'حداقل مبلغ برداشت نماینده (تومان)', 'placeholder' => '500000'],
+        ],
+    ],
+
     'wheel' => [
         'title' => 'گردونه شانس و امتیاز',
         'icon'  => 'gift',
