@@ -1743,6 +1743,58 @@ try {
     // Forward-compat: optional host mapping for future multi-host balancing.
     addFieldToTable("reseller_service", "panel_host_id", "", "VARCHAR(50)");
 
+    // Per-reseller Telegram bot (Phase 4): bot identity + webhook secret.
+    // (bot_token / bot_username already exist from Phase 3's reseller table.)
+    addFieldToTable("reseller", "bot_secret", "", "VARCHAR(120)");
+    addFieldToTable("reseller", "bot_status", "0", "VARCHAR(20)");
+    addFieldToTable("reseller", "support_link", "", "VARCHAR(200)");
+
+    // Customers that interact with a reseller's bot (own wallet per reseller).
+    $connect->query("CREATE TABLE IF NOT EXISTS reseller_customer (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        reseller_id INT UNSIGNED NOT NULL,
+        chat_id BIGINT NOT NULL,
+        first_name VARCHAR(200) NULL,
+        username VARCHAR(190) NULL,
+        balance BIGINT NOT NULL DEFAULT 0,
+        step VARCHAR(60) NOT NULL DEFAULT '',
+        step_data TEXT NULL,
+        created_at VARCHAR(30) NULL,
+        last_seen VARCHAR(30) NULL,
+        UNIQUE KEY uniq_rescust (reseller_id, chat_id),
+        INDEX idx_rescust_reseller (reseller_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    // Customer wallet top-ups through the reseller bot (gateway pending records).
+    $connect->query("CREATE TABLE IF NOT EXISTS reseller_customer_payment (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        reseller_id INT UNSIGNED NOT NULL,
+        customer_chat_id BIGINT NOT NULL,
+        gateway VARCHAR(40) NOT NULL,
+        order_id VARCHAR(80) NOT NULL UNIQUE,
+        authority VARCHAR(256) NULL,
+        amount BIGINT NOT NULL DEFAULT 0,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        ref VARCHAR(200) NULL,
+        created_at VARCHAR(30) NULL,
+        paid_at VARCHAR(30) NULL,
+        INDEX idx_rcpay_reseller (reseller_id),
+        INDEX idx_rcpay_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    // Customer-facing sell price a reseller sets per product (overrides default).
+    $connect->query("CREATE TABLE IF NOT EXISTS reseller_product_sell (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        reseller_id INT UNSIGNED NOT NULL,
+        product_code VARCHAR(200) NOT NULL,
+        sell_price BIGINT NOT NULL DEFAULT 0,
+        UNIQUE KEY uniq_ressell (reseller_id, product_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    // Ledger ownership: tag entries as customer-wallet movements when needed.
+    addFieldToTable("reseller_service", "sold_via", "panel", "VARCHAR(20)");
+    addFieldToTable("reseller_service", "sell_price", "0", "VARCHAR(50)");
+
     // Product flags: sellable by resellers + optional reseller-specific price.
     addFieldToTable("product", "reseller_status", "0", "VARCHAR(20)");
     addFieldToTable("product", "reseller_price", "", "VARCHAR(50)");

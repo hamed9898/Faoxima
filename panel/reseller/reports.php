@@ -14,6 +14,7 @@ $offset = ($page - 1) * $perPage;
 $ledgerLabels = [
     'topup'           => 'شارژ کیف پول',
     'purchase'        => 'خرید سرویس',
+    'sale'            => 'فروش به مشتری (ربات)',
     'withdraw'        => 'برداشت وجه',
     'withdraw_refund' => 'بازگشت برداشت',
     'admin_credit'    => 'افزایش توسط مدیر',
@@ -45,6 +46,7 @@ $sum = static function ($pdo, $rid, $type) {
 $totalTopup = $sum($pdo, $rid, 'topup');
 $totalSpent = abs($sum($pdo, $rid, 'purchase'));
 $totalWithdraw = abs($sum($pdo, $rid, 'withdraw'));
+$totalSales = $sum($pdo, $rid, 'sale');
 
 reseller_layout_head('حسابداری', 'reports', $reseller);
 ?>
@@ -69,6 +71,10 @@ reseller_layout_head('حسابداری', 'reports', $reseller);
         <div class="stat-card__info"><span class="stat-card__value"><?php echo number_format($totalWithdraw); ?></span><span class="stat-card__label">مجموع برداشت</span></div>
     </div>
     <div class="stat-card">
+        <div class="stat-card__icon icon-green"><?php echo icon('robot', 'svg-icon'); ?></div>
+        <div class="stat-card__info"><span class="stat-card__value"><?php echo number_format($totalSales); ?></span><span class="stat-card__label">مجموع فروش ربات</span></div>
+    </div>
+    <div class="stat-card">
         <div class="stat-card__icon icon-rose"><?php echo icon('wallet', 'svg-icon'); ?></div>
         <div class="stat-card__info"><span class="stat-card__value"><?php echo number_format((int) $reseller['balance']); ?></span><span class="stat-card__label">موجودی فعلی</span></div>
     </div>
@@ -81,6 +87,7 @@ reseller_layout_head('حسابداری', 'reports', $reseller);
             <a href="reports.php" class="chip<?php echo $typeFilter === 'all' ? ' active' : ''; ?>"><span>همه</span></a>
             <a href="reports.php?type=topup" class="chip<?php echo $typeFilter === 'topup' ? ' active' : ''; ?>"><span>شارژ</span></a>
             <a href="reports.php?type=purchase" class="chip<?php echo $typeFilter === 'purchase' ? ' active' : ''; ?>"><span>خرید</span></a>
+            <a href="reports.php?type=sale" class="chip<?php echo $typeFilter === 'sale' ? ' active' : ''; ?>"><span>فروش ربات</span></a>
             <a href="reports.php?type=withdraw" class="chip<?php echo $typeFilter === 'withdraw' ? ' active' : ''; ?>"><span>برداشت</span></a>
         </div>
     </div>
