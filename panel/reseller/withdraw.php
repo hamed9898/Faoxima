@@ -45,17 +45,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: withdraw.php');
         exit;
     }
-    $ins = $pdo->prepare(
-        "INSERT INTO reseller_withdraw (reseller_id, amount, network, address, status, created_at)
-         VALUES (:rid, :amt, :net, :addr, 'pending', :ts)"
-    );
-    $ins->execute([
-        ':rid'  => $rid,
-        ':amt'  => $amount,
-        ':net'  => $network,
-        ':addr' => mb_substr($address, 0, 190),
-        ':ts'   => (string) time(),
-    ]);
+    // اگر ثبت ردیف درخواست برداشت شکست بخورد، باید مبلغِ از قبل کسرشده را بازگردانیم؛
+    // در غیر این صورت پول از کیف پول نماینده کم می‌شد بدون آنکه درخواستی ثبت شده باشد.
+    try {
+        $ins = $pdo->prepare(
+            "INSERT INTO reseller_withdraw (reseller_id, amount, network, address, status, created_at)
+             VALUES (:rid, :amt, :net, :addr, 'pending', :ts)"
+        );
+        $ins->execute([
+            ':rid'  => $rid,
+            ':amt'  => $amount,
+            ':net'  => $network,
+            ':addr' => mb_substr($address, 0, 190),
+            ':ts'   => (string) time(),
+        ]);
+    } catch (\Throwable $e) {
+        error_log('[reseller withdraw] insert failed, refunding hold for reseller ' . $rid . ': ' . $e->getMessage());
+        reseller_wallet_apply($rid, 'withdraw_refund', $amount, 'بازگشت برداشت ناموفق', $address);
+        reseller_flash_set('error', 'خطا در ثبت درخواست برداشت؛ مبلغ به کیف پول بازگشت داده شد.');
+        header('Location: withdraw.php');
+        exit;
+    }
     reseller_flash_set('success', 'درخواست برداشت ثبت شد و پس از تأیید مدیر پرداخت می‌شود.');
     header('Location: withdraw.php');
     exit;

@@ -194,6 +194,13 @@ if (!function_exists('reseller_payment_mark_paid')) {
             'شارژ کیف پول از ' . $row['gateway'],
             $orderId
         );
+        if (empty($apply['ok'])) {
+            // واریز بعد از علامت‌گذاری «paid» شکست خورد؛ ردیف را به «pending» برمی‌گردانیم
+            // تا فراخوانی بعدیِ کال‌بک (تأیید درگاه idempotent است) دوباره شارژ کند و پول گم نشود.
+            $rb = $pdo->prepare("UPDATE reseller_payment SET status = 'pending', paid_at = '' WHERE order_id = :oid AND status = 'paid'");
+            $rb->execute([':oid' => $orderId]);
+            error_log('[reseller_payment_mark_paid] wallet credit failed for order ' . $orderId . '; reverted to pending: ' . (string) ($apply['msg'] ?? 'unknown'));
+        }
         return ['ok' => $apply['ok'], 'amount' => (int) $row['amount'], 'already' => false, 'msg' => $apply['msg']];
     }
 }
