@@ -137,15 +137,27 @@ if (!function_exists('reseller_customer_payment_mark_paid')) {
                 'customer_chat_id' => (int) ($row['customer_chat_id'] ?? 0),
             ];
         }
+        // اگر بعد از علامت‌گذاری به‌عنوان «paid» مرحله‌ی واریز شکست بخورد، ردیف را به «pending»
+        // برمی‌گردانیم تا فراخوانی بعدیِ کال‌بک بتواند دوباره (idempotent) واریز را انجام دهد؛
+        // در غیر این صورت تراکنش در شاخه‌ی «already» گیر می‌کرد و کیف پول هرگز شارژ نمی‌شد.
+        $revert = static function () use ($pdo, $orderId) {
+            $rb = $pdo->prepare("UPDATE reseller_customer_payment SET status = 'pending', paid_at = '' WHERE order_id = :oid AND status = 'paid'");
+            $rb->execute([':oid' => $orderId]);
+        };
         $row = reseller_customer_payment_find($orderId);
         if (!$row) {
             return ['ok' => false, 'amount' => 0, 'already' => false, 'msg' => 'تراکنش یافت نشد', 'reseller_id' => 0, 'customer_chat_id' => 0];
         }
         $customer = reseller_customer_get((int) $row['reseller_id'], (int) $row['customer_chat_id']);
         if (!$customer) {
+            $revert();
             return ['ok' => false, 'amount' => 0, 'already' => false, 'msg' => 'مشتری یافت نشد', 'reseller_id' => (int) $row['reseller_id'], 'customer_chat_id' => (int) $row['customer_chat_id']];
         }
         $apply = reseller_customer_wallet_apply((int) $customer['id'], (int) $row['amount']);
+        if (empty($apply['ok'])) {
+            $revert();
+            error_log('[reseller_customer_payment_mark_paid] wallet credit failed for order ' . $orderId . '; reverted to pending: ' . (string) ($apply['msg'] ?? 'unknown'));
+        }
         return [
             'ok' => $apply['ok'],
             'amount' => (int) $row['amount'],

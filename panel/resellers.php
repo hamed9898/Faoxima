@@ -129,15 +129,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
         }
         require_once __DIR__ . '/reseller/lib.php';
         if ($decision === 'approve') {
-            $upd = $pdo->prepare("UPDATE reseller_withdraw SET status='approved', admin_note=:n, txid=:t, updated_at=:ts WHERE id=:id");
+            // فلیپ اتمیک با شرط status='pending' تا تصمیم دقیقاً یک‌بار اعمال شود.
+            $upd = $pdo->prepare("UPDATE reseller_withdraw SET status='approved', admin_note=:n, txid=:t, updated_at=:ts WHERE id=:id AND status='pending'");
             $upd->execute([':n' => $adminNote, ':t' => $txid, ':ts' => (string) time(), ':id' => $wid]);
-            reseller_admin_redirect('برداشت تأیید شد.');
+            reseller_admin_redirect($upd->rowCount() === 1 ? 'برداشت تأیید شد.' : 'این درخواست قبلاً پردازش شده است.', $upd->rowCount() === 1 ? 'success' : 'error');
         } elseif ($decision === 'reject') {
-            // Refund the held amount back to the reseller wallet.
-            reseller_wallet_apply((int) $w['reseller_id'], 'withdraw_refund', (int) $w['amount'], 'بازگشت وجه برداشت ردشده', 'withdraw:' . $wid, true);
-            $upd = $pdo->prepare("UPDATE reseller_withdraw SET status='rejected', admin_note=:n, updated_at=:ts WHERE id=:id");
+            // ابتدا وضعیت را به‌صورت اتمیک رد می‌کنیم؛ فقط در صورتی که این درخواست واقعاً
+            // همین حالا از pending به rejected تبدیل شد، وجه بازگردانده می‌شود. در غیر این صورت
+            // (مثلاً دابل‌کلیک یا دو ادمین هم‌زمان) از بازگشتِ مضاعف وجه جلوگیری می‌شود.
+            $upd = $pdo->prepare("UPDATE reseller_withdraw SET status='rejected', admin_note=:n, updated_at=:ts WHERE id=:id AND status='pending'");
             $upd->execute([':n' => $adminNote, ':ts' => (string) time(), ':id' => $wid]);
-            reseller_admin_redirect('برداشت رد شد و وجه به کیف پول نماینده بازگشت.');
+            if ($upd->rowCount() === 1) {
+                reseller_wallet_apply((int) $w['reseller_id'], 'withdraw_refund', (int) $w['amount'], 'بازگشت وجه برداشت ردشده', 'withdraw:' . $wid, true);
+                reseller_admin_redirect('برداشت رد شد و وجه به کیف پول نماینده بازگشت.');
+            }
+            reseller_admin_redirect('این درخواست قبلاً پردازش شده است.', 'error');
         }
         reseller_admin_redirect('عملیات نامعتبر.', 'error');
     }
