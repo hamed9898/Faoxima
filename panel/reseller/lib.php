@@ -392,8 +392,20 @@ if (!function_exists('reseller_customer_get')) {
         $sel->execute([':r' => $resellerId, ':c' => $chatId]);
         $row = $sel->fetch(PDO::FETCH_ASSOC);
         if ($row) {
-            $pdo->prepare("UPDATE reseller_customer SET last_seen = :ts, first_name = :fn, username = :un WHERE id = :id")
-                ->execute([':ts' => (string) time(), ':fn' => mb_substr((string) $firstName, 0, 190), ':un' => mb_substr((string) $username, 0, 190), ':id' => (int) $row['id']]);
+            // فقط فیلدهای واقعاً ارائه‌شده را به‌روزرسانی کن؛ در غیر این صورت فراخوانی‌هایی که نام/یوزرنیم
+            // ندارند (مثل کال‌بک پرداخت) مقادیر ذخیره‌شده را با رشته‌ی خالی بازنویسی می‌کردند.
+            $updFields = 'last_seen = :ts';
+            $updParams = [':ts' => (string) time(), ':id' => (int) $row['id']];
+            if ($firstName !== '') {
+                $updFields .= ', first_name = :fn';
+                $updParams[':fn'] = mb_substr((string) $firstName, 0, 190);
+            }
+            if ($username !== '') {
+                $updFields .= ', username = :un';
+                $updParams[':un'] = mb_substr((string) $username, 0, 190);
+            }
+            $pdo->prepare("UPDATE reseller_customer SET {$updFields} WHERE id = :id")
+                ->execute($updParams);
             return $row;
         }
         $ins = $pdo->prepare(
