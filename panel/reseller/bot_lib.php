@@ -233,8 +233,17 @@ if (!function_exists('reseller_bot_purchase')) {
         }
 
         // 4) Record reseller accounting: sale revenue then provisioning cost.
-        reseller_wallet_apply($rid, 'sale', $sell, 'فروش از ربات: ' . ($product['name_product'] ?? $code), 'cust:' . $chatId);
-        reseller_wallet_apply($rid, 'purchase', -$cost, 'هزینه ساخت سرویس ربات: ' . ($product['name_product'] ?? $code), $username);
+        // مقادیر بازگشتی بررسی می‌شوند تا اگر کسر هزینه‌ی ساخت از کیف پول نماینده شکست بخورد
+        // (مثلاً به‌خاطر تخلیه‌ی هم‌زمان موجودی)، یک خطای قابل پیگیری برای تطبیق دستی ادمین ثبت شود؛
+        // در این نقطه سرویس ساخته و مشتری شارژ شده، پس rollback کامل ممکن نیست.
+        $saleApply = reseller_wallet_apply($rid, 'sale', $sell, 'فروش از ربات: ' . ($product['name_product'] ?? $code), 'cust:' . $chatId);
+        if (empty($saleApply['ok'])) {
+            error_log('[reseller_bot_purchase] sale credit failed for reseller ' . $rid . ' (sell=' . $sell . ', user=' . $username . '): ' . (string) ($saleApply['msg'] ?? 'unknown'));
+        }
+        $costApply = reseller_wallet_apply($rid, 'purchase', -$cost, 'هزینه ساخت سرویس ربات: ' . ($product['name_product'] ?? $code), $username);
+        if (empty($costApply['ok'])) {
+            error_log('[reseller_bot_purchase] CRITICAL: provisioning cost debit failed for reseller ' . $rid . ' (cost=' . $cost . ', user=' . $username . ') — service was provisioned and customer charged but reseller wallet not debited; manual reconciliation needed: ' . (string) ($costApply['msg'] ?? 'unknown'));
+        }
 
         // 5) Deliver the subscription.
         $subPage = reseller_bot_origin() . '/panel/reseller/subscription.php?token=' . $prov['sub_token'];

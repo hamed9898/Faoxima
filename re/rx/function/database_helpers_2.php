@@ -904,16 +904,30 @@ function DirectPayment($order_id, $image = 'images.jpg')
                 update("setting", "numbercount", $value);
             }
         }
-        if (function_exists('balance_atomic_charge')) {
-            $__allowNegBp2 = (($Balance_id['agent'] ?? '') === 'n2') ? (int)($Balance_id['maxbuyagent'] ?? 0) : 0;
-            balance_atomic_charge($Balance_id['id'], (float)$get_invoice['price_product'], $__allowNegBp2);
-            $__refreshBp = select("user", "*", "id", $Balance_id['id'], "select");
-            $Balance_prims = max(0, (int)($__refreshBp['Balance'] ?? 0));
-        } else {
-            $Balance_prims = $Balance_id['Balance'] - $get_invoice['price_product'];
-            if ($Balance_prims <= 0) $Balance_prims = 0;
-            update("user", "Balance", $Balance_prims, "id", $Balance_id['id']);
+        // [mixed-payment fix] فلوی «خرید پس از پرداخت» فقط زمانی فعال می‌شود که موجودی کیف پول
+        // کمتر از قیمت محصول باشد؛ در این حالت کاربر «مابه‌التفاوت» (قیمت − موجودی) را از درگاه/کارت
+        // پرداخت کرده و باقیِ مبلغ باید از کیف پول کسر شود. مبلغ پرداخت‌شده در Payment_report['price'] است.
+        // باگ قبلی: کل قیمت محصول از کیف پول کسر می‌شد (balance_atomic_charge با شرط Balance >= price)؛
+        // چون همیشه موجودی < قیمت بود، کسر اتمیک شکست می‌خورد و موجودی اصلاً کم نمی‌شد ⇒ سرویس عملاً رایگان.
+        // درست: سهم کیف پول = قیمت محصول − مبلغ پرداخت‌شده، و به‌صورت اتمیک و بدون منفی‌شدن کسر می‌شود.
+        $__paidPortion   = (float)($Payment_report['price'] ?? 0);
+        $__walletPortion = (float)$get_invoice['price_product'] - $__paidPortion;
+        if ($__walletPortion < 0) {
+            $__walletPortion = 0;
         }
+        try {
+            $__wpStmt = $pdo->prepare("UPDATE user SET Balance = GREATEST(0, Balance - :p) WHERE id = :u");
+            $__wpStmt->execute([':p' => $__walletPortion, ':u' => $Balance_id['id']]);
+        } catch (Throwable $__wpErr) {
+            error_log('[DirectPayment] wallet portion charge failed for user ' . $Balance_id['id'] . ': ' . $__wpErr->getMessage());
+            $__fallbackBal = (float)$Balance_id['Balance'] - $__walletPortion;
+            if ($__fallbackBal < 0) {
+                $__fallbackBal = 0;
+            }
+            update("user", "Balance", $__fallbackBal, "id", $Balance_id['id']);
+        }
+        $__refreshBp = select("user", "*", "id", $Balance_id['id'], "select");
+        $Balance_prims = max(0, (int)($__refreshBp['Balance'] ?? 0));
         $balanceformatsell = select("user", "Balance", "id", $get_invoice['id_user'], "select")['Balance'];
         $balanceformatsell = number_format($balanceformatsell, 0);
         $balancebefore = number_format($Balance_id['Balance'], 0);
