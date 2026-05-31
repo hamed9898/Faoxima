@@ -78,9 +78,5 @@ $GLOBALS['domainhosts']                = $domainhosts;
 $GLOBALS['usernamebot']                = $usernamebot;
 $GLOBALS['telegramCurlTimeout']        = $telegramCurlTimeout;
 $GLOBALS['telegramStrictIpValidation'] = $telegramStrictIpValidation;
-<<<<<<< HEAD
-=======
-$GLOBALS['admin_panel_token']          = $admin_panel_token;
 
 require_once __DIR__ . '/proxy.php';
->>>>>>> 3261ae42fb4a49dce9789401b50ed6076d720056

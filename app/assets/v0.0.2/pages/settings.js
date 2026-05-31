@@ -6,10 +6,10 @@ import { toast } from '../utils.js';
 import { applyBrand } from '../brand.js';
 
 const THEMES = [
-    { key: 'gold',   name: 'طلایی (پیش‌فرض)', color: '#d4b878', bright: '#e2c98c' },
+    { key: 'gold',   name: 'طلایی',            color: '#d4b878', bright: '#e2c98c' },
     { key: 'red',    name: 'قرمز',            color: '#e57373', bright: '#ef9a9a' },
     { key: 'blue',   name: 'آبی',             color: '#64a8e8', bright: '#82bdf3' },
-    { key: 'purple', name: 'بنفش',            color: '#b48def', bright: '#c8a8f3' },
+    { key: 'purple', name: 'بنفش (پیش‌فرض)',   color: '#7c5cff', bright: '#a98bff' },
     { key: 'yellow', name: 'زرد',             color: '#f4d35e', bright: '#f8e285' },
     { key: 'green',  name: 'سبز',             color: '#7fc987', bright: '#9bd5a3' },
     { key: 'orange', name: 'نارنجی',           color: '#f0a868', bright: '#f5be8b' },
@@ -28,17 +28,29 @@ export function applyTheme(themeKey) {
     root.style.setProperty('--gold-soft-2', hexToRgba(theme.color, 0.18));
     root.style.setProperty('--accent-soft',   hexToRgba(theme.color, 0.10));
     root.style.setProperty('--accent-soft-2', hexToRgba(theme.color, 0.18));
+    root.style.setProperty('--accent-glow',  hexToRgba(theme.color, 0.40));
+    root.style.setProperty('--accent-ink',   hexDarken(theme.color, 0.5));
     root.style.setProperty('--border',         hexToRgba(theme.color, 0.12));
     root.style.setProperty('--border-strong',  hexToRgba(theme.color, 0.28));
     root.dataset.theme = theme.key;
 }
 
-export function loadSavedTheme() {
-    let key = 'gold';
+// App is light-only.
+function applyLightMode() {
+    document.documentElement.dataset.mode = 'light';
     try {
-        key = localStorage.getItem(STORAGE_KEY) || 'gold';
+        const mc = document.querySelector('meta[name="theme-color"]');
+        if (mc) mc.setAttribute('content', '#eaedf8');
+    } catch (_) {  }
+}
+
+export function loadSavedTheme() {
+    let key = 'purple';
+    try {
+        key = localStorage.getItem(STORAGE_KEY) || 'purple';
     } catch (_) {  }
     applyTheme(key);
+    applyLightMode();
     return key;
 }
 
@@ -52,6 +64,16 @@ function hexToRgba(hex, alpha) {
     const n = parseInt(m[1], 16);
     const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function hexDarken(hex, f) {
+    const m = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    const r = Math.round(((n >> 16) & 255) * f);
+    const g = Math.round(((n >> 8) & 255) * f);
+    const b = Math.round((n & 255) * f);
+    return `rgb(${r}, ${g}, ${b})`;
 }
 
 function escapeAttr(s) {
@@ -159,7 +181,7 @@ function renderAdminBrandPanel(host, brand) {
 
             <p class="section-title mt-md">لوگو (اختیاری)</p>
             <div class="row-spread" style="gap:10px;align-items:center">
-                <div id="brand-logo-preview" style="width:64px;height:64px;border-radius:14px;background:var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden;color:#0a0907;font-weight:700">
+                <div id="brand-logo-preview" style="width:64px;height:64px;border-radius:14px;background:var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--on-accent);font-weight:700">
                     ${brand.logo_url
                         ? `<img src="${escapeAttr(brand.logo_url)}" alt="logo" style="width:100%;height:100%;object-fit:cover" />`
                         : escapeHtml(brand.mark || 'M')}

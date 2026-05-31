@@ -1759,3 +1759,259 @@ svg.ic-muted  { color: var(--muted, #708599); opacity: 0.85; }
     border: 1px solid var(--border-strong);
 }
 .hidden { display: none !important; }
+
+
+/* ============================================================
+   FINAL DESIGN — "AURORA GLASS"  (glassmorphism, dark + light modes)
+   - Frosted translucent surfaces over an accent-aware aurora.
+   - Dark mode = default (:root).  Light mode = [data-mode="light"].
+   - Accent is user-selectable (7 colors); every accent surface below
+     derives from --accent* set by the theme script, so the colour
+     picker keeps working in BOTH modes.
+   - Fonts (Arad) and all SVG icons untouched.
+   Extra vars set by the theme script:
+     --accent-glow  (rgba accent ~0.40)  → aurora blobs
+     --accent-ink   (darkened accent)    → accent TEXT on light mode
+   ============================================================ */
+
+/* ---------- DARK MODE (default) ---------- */
+:root{
+  color-scheme: dark;
+  --bg:#0a0a18; --bg-soft:#0e0e22; --surface:#16162e; --surface-2:#1c1c3a; --surface-3:#242449;
+  --text:#f3f1ff; --text-muted:#b6b2dc; --text-dim:#807caa;
+  --border:rgba(255,255,255,0.12); --border-strong:rgba(255,255,255,0.24);
+
+  /* glass tints */
+  --glass:          rgba(255,255,255,0.06);
+  --glass-2:        rgba(255,255,255,0.09);
+  --glass-border:   rgba(255,255,255,0.14);
+  --glass-shadow:   0 1px 0 rgba(255,255,255,0.20) inset, 0 26px 64px rgba(0,0,0,0.48);
+
+  --r-sm:14px; --r-md:18px; --r-lg:26px; --r-xl:34px;
+
+  /* accent fallback (purple) — overwritten at runtime by the picker */
+  --gold:#7c5cff; --gold-bright:#a98bff;
+  --accent:#7c5cff; --accent-bright:#a98bff;
+  --accent-ink:#3e2e7f;
+  --gold-soft:rgba(124,92,255,0.16); --gold-soft-2:rgba(124,92,255,0.28);
+  --accent-soft:rgba(124,92,255,0.16); --accent-soft-2:rgba(124,92,255,0.28);
+  --accent-glow:rgba(124,92,255,0.40);
+
+  --on-accent:#14121d;
+
+  --green:#54e39b; --green-soft:rgba(84,227,155,0.16);
+}
+
+/* ---------- LIGHT MODE ---------- */
+[data-mode="light"]{
+  color-scheme: light;
+  --bg:#eaedf8; --bg-soft:#e3e7f3; --surface:#ffffff; --surface-2:#f5f7fc; --surface-3:#eef1f8;
+  --text:#191b29; --text-muted:#565b70; --text-dim:#8a8fa3;
+  --border:rgba(20,24,55,0.10); --border-strong:rgba(20,24,55,0.18);
+
+  --glass:          rgba(255,255,255,0.55);
+  --glass-2:        rgba(255,255,255,0.70);
+  --glass-border:   rgba(255,255,255,0.70);
+  --glass-shadow:   0 1px 0 rgba(255,255,255,0.80) inset, 0 18px 44px rgba(20,24,55,0.12);
+
+  --green:#1f9d57; --green-soft:rgba(34,160,90,0.14);
+}
+
+/* ---------- Aurora background ---------- */
+body{
+  color:var(--text);
+  background:var(--bg);
+  background-image:
+    radial-gradient(820px 560px at 10% -8%, var(--accent-glow), transparent 55%),
+    radial-gradient(760px 560px at 96% 6%, rgba(255,86,180,0.28), transparent 55%),
+    radial-gradient(900px 680px at 50% 120%, rgba(60,160,255,0.30), transparent 55%);
+  background-attachment:fixed;
+}
+[data-mode="light"] body{
+  background-image:
+    radial-gradient(820px 520px at 12% -10%, var(--accent-glow), transparent 60%),
+    radial-gradient(720px 520px at 95% 4%, rgba(255,120,190,0.16), transparent 62%),
+    radial-gradient(820px 560px at 50% 120%, rgba(70,150,255,0.16), transparent 60%);
+}
+
+/* ---------- Header / brand ---------- */
+.app-header{ border-bottom:1px solid var(--border); padding-bottom:16px; }
+.brand-name{ color:var(--text); letter-spacing:1.2px; }
+.brand-mark{
+  background:linear-gradient(135deg,var(--accent-bright),var(--accent));
+  color:var(--on-accent); border-radius:14px;
+  box-shadow:0 8px 26px var(--accent-soft-2), 0 1px 0 rgba(255,255,255,0.25) inset;
+}
+.icon-btn{
+  background:var(--glass); border:1px solid var(--glass-border); color:var(--text-muted);
+  border-radius:14px; backdrop-filter:blur(18px) saturate(160%); -webkit-backdrop-filter:blur(18px) saturate(160%);
+}
+.icon-btn:hover,.icon-btn:active{ color:var(--accent-bright); border-color:var(--border-strong); background:var(--glass-2); }
+[data-mode="light"] .icon-btn:hover{ color:var(--accent-ink); }
+
+/* ---------- Glass surfaces ----------
+   IMPORTANT: backdrop-filter is applied ONLY to top-level surfaces (.card,
+   .toast). Inner panels that live INSIDE a card must NOT have their own
+   backdrop-filter — nested blurs mis-composite on some mobile WebViews
+   (Android Telegram), which caused cards to visually overlap/bleed. They use
+   a more-opaque tint (--glass-2) instead, which reads cleanly over the
+   already-blurred card and also performs better. */
+.card,.toast{
+  background:var(--glass);
+  backdrop-filter:blur(22px) saturate(165%); -webkit-backdrop-filter:blur(22px) saturate(165%);
+  border:1px solid var(--glass-border);
+}
+.empty,.stepper,.plan,.input-mono,.theme-tile,.btn-ghost,.btn-accent,.pay-card,.action-tile,.list-item,.seg{
+  background:var(--glass-2);
+  border:1px solid var(--glass-border);
+}
+.card{ border-radius:var(--r-lg); box-shadow:var(--glass-shadow); }
+.card-window{ background:var(--glass); }
+.card-body{ padding:22px; }
+.card-section + .card-section{ border-top:1px solid var(--border); }
+/* always keep clear separation around the payment form/result panels */
+#pay-form-host:not(:empty), #pay-result-host:not(:empty){ display:block; margin-top:14px; }
+
+/* info card / gauge */
+.info-card::before,.info-card::after{ background:var(--accent); opacity:0.18; }
+.info-gauge-track{ stroke:var(--border-strong); }
+.info-gauge-fill{ stroke:var(--accent-bright); filter:drop-shadow(0 0 9px var(--accent-soft-2)); }
+[data-mode="light"] .info-gauge-fill{ stroke:var(--accent); }
+
+/* ---------- Buttons ---------- */
+.btn{ border-radius:999px; padding:14px 22px; letter-spacing:0.2px; }
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent-bright),var(--accent));
+  color:var(--on-accent); border:1px solid rgba(255,255,255,0.25);
+  box-shadow:0 12px 32px var(--accent-soft-2), 0 1px 0 rgba(255,255,255,0.32) inset;
+}
+.btn-primary:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+.btn-primary:active{ transform:translateY(0); }
+.btn-ghost{ color:var(--text); }
+.btn-ghost:hover{ border-color:var(--border-strong); background:var(--glass-2); }
+.btn-accent{ color:var(--accent-bright); background:var(--accent-soft); border:1px solid var(--border-strong); }
+[data-mode="light"] .btn-accent{ color:var(--accent-ink); }
+.btn-accent:hover{ background:var(--accent-soft-2); border-color:var(--accent); }
+
+/* ---------- Plans ---------- */
+.plan{ border-radius:var(--r-md); }
+.plan:hover{ border-color:var(--border-strong); transform:translateY(-1px); }
+.plan.is-selected{
+  border-color:var(--accent);
+  background:linear-gradient(180deg,var(--accent-soft-2),transparent 72%), var(--glass);
+  box-shadow:0 0 0 1px var(--accent), 0 14px 32px var(--accent-soft);
+}
+.plan-title{ font-size:15px; }
+.plan-price .amt{ font-size:17px; color:var(--accent-bright); }
+[data-mode="light"] .plan-price .amt{ color:var(--accent-ink); }
+.plan-price .unit{ color:var(--text-dim); }
+
+/* ---------- Section headings ---------- */
+.section-title{ color:var(--accent-bright); letter-spacing:2px; }
+[data-mode="light"] .section-title{ color:var(--accent-ink); }
+.section-headline{ letter-spacing:-0.2px; }
+
+/* ---------- Stepper ---------- */
+.stepper{ border-radius:var(--r-md); }
+.step .dot{ background:var(--glass-2); border-color:var(--glass-border); color:var(--text-dim); }
+.step.is-active .dot{
+  background:linear-gradient(135deg,var(--accent-bright),var(--accent));
+  color:var(--on-accent); border-color:transparent; box-shadow:0 6px 16px var(--accent-soft-2);
+}
+.step.is-done .dot{ background:var(--accent-soft); color:var(--accent-bright); border-color:var(--border-strong); }
+[data-mode="light"] .step.is-done .dot{ color:var(--accent-ink); }
+
+/* ---------- Badges / chips ---------- */
+.badge{ border-radius:999px; background:var(--glass-2); }
+.badge.is-active{ color:var(--green); background:var(--green-soft); border-color:var(--border-strong); }
+.badge.is-active::before{ background:var(--green); box-shadow:0 0 8px var(--green); }
+.badge.is-gold{ background:var(--accent-soft); color:var(--accent-bright); border-color:var(--border-strong); }
+[data-mode="light"] .badge.is-gold{ color:var(--accent-ink); }
+.badge.is-gold::before{ background:var(--accent); box-shadow:0 0 8px var(--accent); }
+.chip{ border-radius:999px; }
+.chip:hover{ background:var(--accent-soft); border-color:var(--border-strong); }
+.chip.is-active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-bright); }
+[data-mode="light"] .chip.is-active{ color:var(--accent-ink); }
+
+/* ---------- Inputs ---------- */
+.input-mono{ border-radius:var(--r-md); padding:13px 16px; }
+.input-mono::before{ display:none; }
+.input-mono input{ color:var(--text); }
+.input-mono:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.form-row input,.form-row textarea{ background:var(--glass); border:1px solid var(--glass-border); border-radius:var(--r-md); }
+.form-row input:focus,.form-row textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+
+/* ---------- Lists / kv ---------- */
+.list-item{ border-radius:var(--r-md); }
+.list-item:hover{ border-color:var(--border-strong); }
+.kv-value.gold,.kv-value.accent{ color:var(--accent-bright); }
+[data-mode="light"] .kv-value.gold,[data-mode="light"] .kv-value.accent{ color:var(--accent-ink); }
+.progress-fill{ background:linear-gradient(90deg,var(--accent),var(--accent-bright)); }
+
+/* ---------- Empty / 404 ---------- */
+.empty{ border-radius:var(--r-lg); }
+.empty h3{ color:var(--text); }
+.empty .glyph{ color:var(--accent-bright); }
+[data-mode="light"] .empty .glyph{ color:var(--accent-ink); }
+
+/* ---------- Pay / action tiles ---------- */
+.pay-card{ border-radius:var(--r-md); }
+.pay-card.is-selected{ border-color:var(--accent); background:linear-gradient(180deg,var(--accent-soft-2),transparent 72%), var(--glass); box-shadow:0 0 0 1px var(--accent); }
+.action-tile{ border-radius:var(--r-md); }
+.action-tile:hover:not(:disabled){ background:var(--accent-soft); border-color:var(--border-strong); }
+
+/* ---------- Display-mode segmented toggle (new, in settings) ---------- */
+.seg{ display:flex; gap:6px; padding:6px; border-radius:999px; margin:10px 0 4px; }
+.seg-btn{
+  flex:1; padding:11px 14px; border-radius:999px; border:1px solid transparent;
+  background:transparent; color:var(--text-muted); font-weight:700; font-size:14px;
+  font-family:var(--font-sans); cursor:pointer; transition:all .18s ease;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+}
+.seg-btn:hover{ color:var(--text); }
+.seg-btn.is-active{
+  background:linear-gradient(135deg,var(--accent-bright),var(--accent));
+  color:var(--on-accent); box-shadow:0 8px 20px var(--accent-soft-2);
+}
+
+/* ---------- Color picker tiles ---------- */
+.theme-tile{ border-radius:var(--r-md); }
+.theme-tile:hover{ border-color:var(--border-strong); }
+.theme-tile.is-active{
+  border-color:var(--accent);
+  background:linear-gradient(180deg,var(--accent-soft-2),transparent 75%), var(--glass);
+  box-shadow:0 0 0 1px var(--accent);
+}
+.theme-tile.is-active .theme-name{ color:var(--accent-bright); }
+[data-mode="light"] .theme-tile.is-active .theme-name{ color:var(--accent-ink); }
+.theme-name{ color:var(--text); }
+.theme-swatch{ width:30px; height:30px; box-shadow:0 2px 10px rgba(0,0,0,0.4); }
+
+/* ---------- Tab bar (floating, fully rounded glass) ---------- */
+.tabbar{
+  inset-inline:12px;
+  bottom:calc(env(safe-area-inset-bottom, 0px) + 12px);
+  padding:8px 8px;
+  background:var(--glass);
+  backdrop-filter:blur(28px) saturate(170%); -webkit-backdrop-filter:blur(28px) saturate(170%);
+  border:1px solid var(--glass-border);
+  border-radius:26px;
+  box-shadow:0 14px 38px rgba(0,0,0,0.45);
+}
+[data-mode="light"] .tabbar{ box-shadow:0 14px 34px rgba(20,24,55,0.14); }
+/* keep page content clear of the floating bar */
+.app-shell{ padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 104px); }
+.tab{ position:relative; color:var(--text-dim); border-radius:18px; }
+.tab.is-active{ color:var(--accent-bright); }
+[data-mode="light"] .tab.is-active{ color:var(--accent-ink); }
+.tab.is-active::before{
+  content:""; position:absolute; top:4px; left:50%; transform:translateX(-50%);
+  width:24px; height:3px; border-radius:999px; background:var(--accent);
+  box-shadow:0 0 10px var(--accent);
+}
+
+/* ---------- White text on dark-enough accent (purple) — both modes ---------- */
+[data-theme="purple"] .btn-primary,
+[data-theme="purple"] .brand-mark,
+[data-theme="purple"] .step.is-active .dot,
+[data-theme="purple"] .seg-btn.is-active{ color:#ffffff; }
