@@ -158,6 +158,8 @@ Faoxima/
 ## 🧪 سلامت مالی و تست
 تمام مسیرهای مالی (ربات اصلی، پنل نماینده، ربات نماینده) برای کسر/واریز **اتمیک و دقیقاً‌یک‌بار** ممیزی شده‌اند. باگ پرداخت ترکیبی (عدم کسر موجودی اولیه‌ی کیف پول) برطرف شده است.
 
+## 💸 Support / حمایت مالی
+<a href="https://plisio.net/donate/xNyn7NLZ" target="_blank"><img src="https://plisio.net/img/donate/donate_light_icons_color.png" alt="Donate Crypto on Plisio" width="240" height="80" /></a>
 ---
 
 <div align="center">
