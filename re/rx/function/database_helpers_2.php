@@ -1095,16 +1095,15 @@ function DirectPayment($order_id, $image = 'images.jpg')
                 update("setting", "numbercount", $value);
             }
         }
-        if (function_exists('balance_atomic_charge')) {
-            $__allowNegBp2 = (($Balance_id['agent'] ?? '') === 'n2') ? (int)($Balance_id['maxbuyagent'] ?? 0) : 0;
-            balance_atomic_charge($Balance_id['id'], (float)$get_invoice['price_product'], $__allowNegBp2);
-            $__refreshBp = select("user", "*", "id", $Balance_id['id'], "select");
-            $Balance_prims = max(0, (int)($__refreshBp['Balance'] ?? 0));
-        } else {
-            $Balance_prims = $Balance_id['Balance'] - $get_invoice['price_product'];
-            if ($Balance_prims <= 0) $Balance_prims = 0;
-            update("user", "Balance", $Balance_prims, "id", $Balance_id['id']);
+        $__walletPortion = (float)$get_invoice['price_product'] - (float)($Payment_report['price'] ?? 0);
+        if ($__walletPortion < 0) {
+            $__walletPortion = 0;
         }
+        $Balance_prims = (float)$Balance_id['Balance'] - $__walletPortion;
+        if ($Balance_prims <= 0) {
+            $Balance_prims = 0;
+        }
+        update("user", "Balance", $Balance_prims, "id", $Balance_id['id']);
         $balanceformatsell = select("user", "Balance", "id", $get_invoice['id_user'], "select")['Balance'];
         $balanceformatsell = number_format($balanceformatsell, 0);
         $balancebefore = number_format($Balance_id['Balance'], 0);
