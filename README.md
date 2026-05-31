@@ -305,7 +305,7 @@ Open source. Refactored and maintained by the community.
 متن‌باز — بازطراحی و نگهداری توسط جامعه‌ی کاربری.
 
 ## 💸 Support / حمایت مالی
-👉 [NowPayments Donation](https://nowpayments.io/donation/faoximabot)
+<a href="https://plisio.net/donate/xNyn7NLZ" target="_blank"><img src="https://plisio.net/img/donate/donate_light_icons_color.png" alt="Donate Crypto on Plisio" width="240" height="80" /></a>
 
 <div align="center">
 
