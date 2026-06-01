@@ -965,6 +965,11 @@ async function renderExtraPanel($panel, info, username, kind, reload) {
             <span class="kv-label">${icon('wallet')} موجودی</span>
             <span class="kv-value mono">${fmtNum(q.balance || 0)} تومان</span>
         </div>
+        <div class="form-row mt-sm" style="display:flex;gap:8px">
+            <input id="extra-discount" type="text" autocomplete="off" placeholder="کد تخفیف (اختیاری)" style="flex:1" />
+            <button id="extra-discount-apply" type="button" class="btn btn-secondary">اعمال</button>
+        </div>
+        <p class="muted" id="extra-discount-msg" style="font-size:12px;display:none"></p>
         <button id="extra-submit" type="button" class="btn btn-primary btn-block mt-md">
             ${icon('check', 'class="ico ico-leading"')}
             <span class="extra-label">پرداخت و افزودن</span>
@@ -974,11 +979,54 @@ async function renderExtraPanel($panel, info, username, kind, reload) {
 
     const $amount = $host.querySelector('#extra-amount');
     const $total = $host.querySelector('#extra-total');
+    let appliedDiscount = '';
+    let discountedTotal = null;
     const recompute = () => {
         const a = Number($amount.value || 0);
+        appliedDiscount = '';
+        discountedTotal = null;
+        const $dmsg = $host.querySelector('#extra-discount-msg');
+        if ($dmsg) $dmsg.style.display = 'none';
         $total.textContent = `${fmtNum(a * ppu)} تومان`;
     };
     $amount.addEventListener('input', recompute);
+
+    const $disc = $host.querySelector('#extra-discount');
+    const $discApply = $host.querySelector('#extra-discount-apply');
+    const $discMsg = $host.querySelector('#extra-discount-msg');
+    if ($discApply && $disc) {
+        $discApply.addEventListener('click', async () => {
+            const code = String($disc.value || '').trim();
+            const a = parseInt($amount.value || '0', 10);
+            if (!code) { toast('کد تخفیف را وارد کنید', 'warn'); return; }
+            if (!a || a < minA || a > maxA) { toast(`ابتدا مقدار معتبر وارد کنید`, 'warn'); return; }
+            $discApply.disabled = true;
+            try {
+                const r = await call('discount_validate', {
+                    method: 'POST',
+                    body: { code, context: kind === 'time' ? 'time' : 'volume', username, base_price: a * ppu },
+                });
+                const obj = r?.obj || {};
+                appliedDiscount = code;
+                if (obj.final_price != null) {
+                    discountedTotal = Number(obj.final_price);
+                    $total.textContent = `${fmtNum(discountedTotal)} تومان`;
+                }
+                $discMsg.style.display = 'block';
+                $discMsg.textContent = obj.message || 'کد تخفیف اعمال شد';
+                hapticNotify('success');
+            } catch (err) {
+                appliedDiscount = '';
+                discountedTotal = null;
+                $discMsg.style.display = 'block';
+                $discMsg.textContent = err.message || 'کد تخفیف نامعتبر است';
+                $total.textContent = `${fmtNum(a * ppu)} تومان`;
+                hapticNotify('error');
+            } finally {
+                $discApply.disabled = false;
+            }
+        });
+    }
 
     const $btn = $host.querySelector('#extra-submit');
     const $label = $btn.querySelector('.extra-label');
@@ -994,7 +1042,9 @@ async function renderExtraPanel($panel, info, username, kind, reload) {
         try {
             const res = await call('service_extra_confirm', {
                 method: 'POST',
-                body: { username, kind, amount: a },
+                body: appliedDiscount
+                    ? { username, kind, amount: a, discount_code: appliedDiscount }
+                    : { username, kind, amount: a },
             });
             const obj = res?.obj || {};
             if (obj.kind === 'done') {

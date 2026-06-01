@@ -37,7 +37,8 @@
 
         var W = host.clientWidth  || 800;
         var H = host.clientHeight || 380;
-        var padL = 56, padR = 20, padT = 20, padB = 40;
+        var padR = 20, padT = 20, padB = 40;
+        var padL = 56; // بعد از نهایی‌شدن maxV پویا تنظیم می‌شود
 
         var maxV = Math.max.apply(null, data);
         var minV = 0;
@@ -48,6 +49,11 @@
         var rounded = Math.ceil(maxV / step) * step;
         if (rounded - maxV < 0.1 * step) rounded += step;
         maxV = rounded;
+
+        // محور عمودی: مبلغِ کامل به تومان (جداکنندهٔ هزارگان + ارقام فارسی)
+        function fmtToman(v) { return persianNum(Math.round(v).toLocaleString('en-US')); }
+        // پهنای ستونِ چپ را با بلندترین برچسب هماهنگ کن تا عددِ تومان بریده نشود
+        padL = Math.max(56, fmtToman(maxV).length * 8 + 18);
 
         var plotW = W - padL - padR;
         var plotH = H - padT - padB;
@@ -81,7 +87,7 @@
             var gy = padT + plotH - (g / 4) * plotH;
             var gv = minV + (g / 4) * (maxV - minV);
             gridLines.push('<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + gy.toFixed(1) + '" stroke="' + gridColor + '" stroke-width="1" stroke-dasharray="2,4"/>');
-            yLabels.push('<text x="' + (padL - 8) + '" y="' + (gy + 4).toFixed(1) + '" fill="' + textMuted + '" font-size="11" text-anchor="end" font-family="Arad, sans-serif">' + fmtShort(Math.round(gv)) + '</text>');
+            yLabels.push('<text x="' + (padL - 8) + '" y="' + (gy + 4).toFixed(1) + '" fill="' + textMuted + '" font-size="11" text-anchor="end" font-family="Arad, sans-serif">' + fmtToman(gv) + '</text>');
         }
 
 

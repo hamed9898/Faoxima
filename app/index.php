@@ -111,7 +111,7 @@ $jsUrl       = htmlspecialchars($assetPrefix . 'assets/v0.0.2/app.js?v=' . $cach
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0a0907" />
+    <meta name="theme-color" content="#eaedf8" />
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -122,22 +122,28 @@ $jsUrl       = htmlspecialchars($assetPrefix . 'assets/v0.0.2/app.js?v=' . $cach
     <script>
     (function () {
         var THEMES = {
-            gold:   { c: '
+            gold:   { c: '#d4b878', b: '#e2c98c' },
             red:    { c: '#e57373', b: '#ef9a9a' },
             blue:   { c: '#64a8e8', b: '#82bdf3' },
-            purple: { c: '#b48def', b: '#c8a8f3' },
+            purple: { c: '#7c5cff', b: '#a98bff' },
             yellow: { c: '#f4d35e', b: '#f8e285' },
             green:  { c: '#7fc987', b: '#9bd5a3' },
             orange: { c: '#f0a868', b: '#f5be8b' }
         };
         function rgba(hex, a) {
-            var m = /^
+            var m = /^#([0-9a-f]{6})$/i.exec(hex);
             if (!m) return hex;
             var n = parseInt(m[1], 16);
             return 'rgba(' + ((n>>16)&255) + ',' + ((n>>8)&255) + ',' + (n&255) + ',' + a + ')';
         }
+        function darken(hex, f) {
+            var m = /^#([0-9a-f]{6})$/i.exec(hex);
+            if (!m) return hex;
+            var n = parseInt(m[1], 16);
+            return 'rgb(' + Math.round(((n>>16)&255)*f) + ',' + Math.round(((n>>8)&255)*f) + ',' + Math.round((n&255)*f) + ')';
+        }
         try {
-            var key = localStorage.getItem('faoxima.theme.accent') || 'gold';
+            var key = localStorage.getItem('faoxima.theme.accent') || 'purple';
             var t = THEMES[key] || THEMES.gold;
             var s = document.documentElement.style;
             s.setProperty('--gold', t.c);
@@ -148,9 +154,16 @@ $jsUrl       = htmlspecialchars($assetPrefix . 'assets/v0.0.2/app.js?v=' . $cach
             s.setProperty('--gold-soft-2', rgba(t.c, 0.18));
             s.setProperty('--accent-soft',   rgba(t.c, 0.10));
             s.setProperty('--accent-soft-2', rgba(t.c, 0.18));
+            s.setProperty('--accent-glow',   rgba(t.c, 0.40));
+            s.setProperty('--accent-ink',    darken(t.c, 0.5));
             s.setProperty('--border',        rgba(t.c, 0.12));
             s.setProperty('--border-strong', rgba(t.c, 0.28));
             document.documentElement.dataset.theme = key;
+
+            var mode = 'light';
+            document.documentElement.dataset.mode = mode;
+            var mc = document.querySelector('meta[name="theme-color"]');
+            if (mc) mc.setAttribute('content', '#eaedf8');
         } catch (e) {  }
     })();
 </script>

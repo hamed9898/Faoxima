@@ -263,6 +263,12 @@ function renderForm(view, methodId, method, limits) {
                        step="1000" placeholder="مثال: ${fmtNum(Math.max(limits.min, 50000))}" />
             </div>
 
+            <div class="form-row mt-sm" style="display:flex;gap:8px">
+                <input id="pay-discount" type="text" autocomplete="off" placeholder="کد تخفیف شارژ (اختیاری)" style="flex:1" />
+                <button id="pay-discount-apply" type="button" class="btn btn-secondary">اعمال</button>
+            </div>
+            <p class="muted" id="pay-discount-msg" style="font-size:12px;display:none"></p>
+
             <button id="pay-submit" type="button" class="btn btn-primary btn-block mt-md">
                 ${icon('check', 'class="ico ico-leading"')}
                 <span class="pay-submit-label">تأیید و ادامه</span>
@@ -274,6 +280,46 @@ function renderForm(view, methodId, method, limits) {
     const $amt = $host.querySelector('#pay-amount');
     const $btn = $host.querySelector('#pay-submit');
     const $btnLabel = $btn.querySelector('.pay-submit-label');
+
+    let appliedChargeCode = '';
+    const $disc = $host.querySelector('#pay-discount');
+    const $discApply = $host.querySelector('#pay-discount-apply');
+    const $discMsg = $host.querySelector('#pay-discount-msg');
+    if ($amt) {
+        $amt.addEventListener('input', () => {
+            appliedChargeCode = '';
+            if ($discMsg) $discMsg.style.display = 'none';
+        });
+    }
+    if ($discApply && $disc) {
+        $discApply.addEventListener('click', async () => {
+            const code = String($disc.value || '').trim();
+            const amount = parseInt($amt.value || '0', 10);
+            if (!code) { toast('کد تخفیف را وارد کنید', 'warn'); return; }
+            if (!amount || amount < limits.min || amount > limits.max) {
+                toast(`ابتدا مبلغ معتبر وارد کنید`, 'warn'); return;
+            }
+            $discApply.disabled = true;
+            try {
+                const r = await call('discount_validate', {
+                    method: 'POST',
+                    body: { code, context: 'charge', base_price: amount },
+                });
+                const obj = r?.obj || {};
+                appliedChargeCode = code;
+                $discMsg.style.display = 'block';
+                $discMsg.textContent = obj.message || 'کد تخفیف اعمال شد';
+                hapticNotify('success');
+            } catch (err) {
+                appliedChargeCode = '';
+                $discMsg.style.display = 'block';
+                $discMsg.textContent = err.message || 'کد تخفیف نامعتبر است';
+                hapticNotify('error');
+            } finally {
+                $discApply.disabled = false;
+            }
+        });
+    }
 
     $btn.addEventListener('click', async () => {
         const amount = parseInt($amt.value || '0', 10);
@@ -294,7 +340,9 @@ function renderForm(view, methodId, method, limits) {
         try {
             const res = await call('payment_init', {
                 method: 'POST',
-                body: { method: methodId, amount },
+                body: appliedChargeCode
+                    ? { method: methodId, amount, discount_code: appliedChargeCode }
+                    : { method: methodId, amount },
             });
             const obj = res?.obj || {};
             handleInitResult(view, methodId, obj);
