@@ -1598,11 +1598,16 @@ $textonebuy
         sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
         return;
     }
-    $stmt = $pdo->prepare("SELECT * FROM DiscountSell WHERE (code_product = :code_product OR code_product = 'all') AND (code_panel = :code_panel OR code_panel = '/all') AND codeDiscount = :codeDiscount AND (agent = :agent OR agent = 'allusers') AND (type = 'all' OR type = 'buy')");
+    if (intval($user['pricediscount']) != 0) {
+        sendmessage($from_id, "❌ شما تخفیف اختصاصی دارید و امکان استفاده از کد تخفیف وجود ندارد.", $backuser, 'HTML');
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM DiscountSell WHERE (code_product = :code_product OR code_product = 'all') AND (code_panel = :code_panel OR code_panel = '/all') AND codeDiscount = :codeDiscount AND (agent = :agent OR agent = 'allusers' OR agent = 'all') AND (type = 'all' OR type = 'buy') AND (status IS NULL OR status = '' OR status = 'active') AND (target_user IS NULL OR target_user = '' OR target_user = :uid)");
     $stmt->bindParam(':code_product', $info_product['code_product'], PDO::PARAM_STR);
     $stmt->bindParam(':code_panel', $marzban_list_get['code_panel'], PDO::PARAM_STR);
     $stmt->bindParam(':agent', $user['agent'], PDO::PARAM_STR);
     $stmt->bindParam(':codeDiscount', $text, PDO::PARAM_STR);
+    $stmt->bindParam(':uid', $from_id, PDO::PARAM_STR);
     $stmt->execute();
     $SellDiscountlimit = $stmt->fetch(PDO::FETCH_ASSOC);
     $stmt = $pdo->prepare("SELECT * FROM Giftcodeconsumed WHERE id_user = :from_id AND code = :code");
@@ -1618,7 +1623,7 @@ $textonebuy
         sendmessage($from_id, "❌ زمان کد تخفیف به پایان رسیده است.", null, 'HTML');
         return;
     }
-    if (($SellDiscountlimit['limitDiscount'] <= $SellDiscountlimit['usedDiscount'])) {
+    if (intval($SellDiscountlimit['limitDiscount']) > 0 && intval($SellDiscountlimit['usedDiscount']) >= intval($SellDiscountlimit['limitDiscount'])) {
         sendmessage($from_id, $textbotlang['users']['Discount']['erorrlimit'], null, 'HTML');
         return;
     }
@@ -1637,7 +1642,11 @@ $textonebuy
             return;
         }
     }
-    sendmessage($from_id, "🤩 کد تخفیف شما درست بود و  {$SellDiscountlimit['price']} درصد تخفیف روی فاکتور شما اعمال شد.", null, 'HTML');
+    $__dvt = strtolower(trim((string)($SellDiscountlimit['value_type'] ?? '')));
+    if (!in_array($__dvt, ['percent', 'amount', 'free'], true)) $__dvt = 'percent';
+    $__dval = (float)$SellDiscountlimit['price'];
+    $__dlabel = $__dvt === 'free' ? 'رایگان' : ($__dvt === 'amount' ? number_format($__dval) . ' تومان' : $SellDiscountlimit['price'] . ' درصد');
+    sendmessage($from_id, "🤩 کد تخفیف شما درست بود و تخفیف {$__dlabel} روی فاکتور شما اعمال شد.", null, 'HTML');
     step('payment', $from_id);
     $parts = explode("_", $user['Processing_value_one']);
     $eextraprice = json_decode($marzban_list_get['pricecustomvolume'], true);
@@ -1669,10 +1678,15 @@ $textonebuy
         step('home', $from_id);
         return;
     }
-    $result = ($SellDiscountlimit['price'] / 100) * $info_product['price_product'];
-
     $info_productmain = $info_product['price_product'];
-    $info_product['price_product'] = $info_product['price_product'] - $result;
+    if ($__dvt === 'free') {
+        $info_product['price_product'] = 0;
+    } elseif ($__dvt === 'amount') {
+        $info_product['price_product'] = $info_product['price_product'] - $__dval;
+    } else {
+        $result = ($__dval / 100) * $info_product['price_product'];
+        $info_product['price_product'] = $info_product['price_product'] - $result;
+    }
     $info_product['price_product'] = round($info_product['price_product']);
     if ($info_product['Service_time'] == 0)
         $info_product['Service_time'] = $textbotlang['users']['stateus']['Unlimited'];
@@ -2658,9 +2672,60 @@ $textonebuy
         }
     }
     update("user", "Processing_value", $balancelast, "id", $from_id);
-    sendmessage($from_id, $textbotlang['users']['Balance']['selectPatment'], $step_payment, 'HTML');
+    update("user", "Processing_value_four", "", "id", $from_id);
+    $__askdisc = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "✅ بله، کد تخفیف دارم", 'callback_data' => "chargehasdiscount"],
+            ],
+            [
+                ['text' => "➡️ خیر، ادامه به پرداخت", 'callback_data' => "chargenodiscount"],
+            ]
+        ]
+    ]);
+    sendmessage($from_id, "🎁 آیا برای شارژ کیف پول کد تخفیف دارید؟", $__askdisc, 'HTML');
+    step('home', $from_id);
+} elseif ($datain == "chargenodiscount") {
+    update("user", "Processing_value_four", "", "id", $from_id);
+    Editmessagetext($from_id, $message_id, $textbotlang['users']['Balance']['selectPatment'], $step_payment);
+    step('get_step_payment', $from_id);
+} elseif ($datain == "chargehasdiscount") {
+    sendmessage($from_id, $textbotlang['users']['Discount']['getcodesell'], $backuser, 'HTML');
+    step('getcodesellDiscountcharge', $from_id);
+    deletemessage($from_id, $message_id);
+} elseif ($user['step'] == "getcodesellDiscountcharge") {
+    $__amount = intval($user['Processing_value']);
+    if ($__amount <= 0) {
+        sendmessage($from_id, "❌ مبلغ شارژ نامعتبر است. مجددا تلاش کنید.", $keyboard, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    if (!in_array($text, $SellDiscount)) {
+        sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
+        return;
+    }
+    $dv = nm_validateSellDiscount($text, 'charge', '', '', $user, $from_id);
+    if (empty($dv['ok'])) {
+        sendmessage($from_id, $dv['reason'], $backuser, 'HTML');
+        return;
+    }
+    $__gatewayAmount = (int) round(nm_applySellDiscountToPrice($dv['row'], $__amount));
+    if ($__gatewayAmount <= 0) {
+        sendmessage($from_id, "❌ این کد برای شارژ قابل استفاده نیست (مبلغ پرداختی صفر می‌شود).", $backuser, 'HTML');
+        return;
+    }
+    $__bonus = $__amount - $__gatewayAmount;
+    if ($__bonus < 0) $__bonus = 0;
+    update("user", "Processing_value", $__gatewayAmount, "id", $from_id);
+    update("user", "Processing_value_four", "chg|" . $__bonus, "id", $from_id);
+    nm_markSellDiscountUsed($text, $from_id, $username, 'charge');
+    $__amountfmt  = number_format($__amount, 0);
+    $__gatewayfmt = number_format($__gatewayAmount, 0);
+    $__txt = "🤩 کد تخفیف {$dv['label']} روی شارژ کیف پول اعمال شد.\n\n💎 مبلغ شارژ کیف پول : {$__amountfmt} تومان\n💸 مبلغ قابل پرداخت : {$__gatewayfmt} تومان\n\nروش پرداخت را انتخاب کنید:";
+    sendmessage($from_id, $__txt, $step_payment, 'HTML');
     step('get_step_payment', $from_id);
 } elseif ($user['step'] == "get_step_payment") {
+    $__chargeBonus = function_exists('nm_pending_charge_bonus') ? nm_pending_charge_bonus($user) : 0;
     if ($datain == "cart_to_offline") {
         $PaySetting = select("PaySetting", "ValuePay", "NamePay", "statuscardautoconfirm", "select")['ValuePay'];
         $from_id_sql = (string) $from_id;
@@ -3901,5 +3966,9 @@ $textonebuy
         }
         $message_id = sendmessage($from_id, $textstar, $paymentkeyboard, 'HTML');
         updatePaymentMessageId($message_id, $randomString);
+    }
+
+    if ($__chargeBonus > 0 && isset($randomString) && $randomString !== '') {
+        update("Payment_report", "charge_bonus", $__chargeBonus, "id_order", $randomString);
     }
 }

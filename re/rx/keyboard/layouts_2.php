@@ -733,14 +733,15 @@ $rxAdminPanelBtn = function (string $text, string $menuKey, string $default = 'd
     $allowed = ['default','primary','success','danger'];
     $map = $rxAdminPanelStylesAll[$menuKey] ?? [];
 
+    $rxUseDefaults = (!function_exists('rx_kb_use_defaults') || rx_kb_use_defaults());
+
     if (is_array($map) && array_key_exists($text, $map)) {
         $style = (string)$map[$text];
     } else {
-        $style = $default;
+        $style = $rxUseDefaults ? $default : 'default';
 
 
-        if ($default === 'default' && function_exists('rx_getKeyboardDefaultStyles')
-            && (!function_exists('rx_kb_use_defaults') || rx_kb_use_defaults())) {
+        if ($rxUseDefaults && $default === 'default' && function_exists('rx_getKeyboardDefaultStyles')) {
             $rxFallbackMap = rx_getKeyboardDefaultStyles($menuKey);
             if (is_array($rxFallbackMap) && isset($rxFallbackMap[$text])) {
                 $rxFallback = (string)$rxFallbackMap[$text];
@@ -751,14 +752,13 @@ $rxAdminPanelBtn = function (string $text, string $menuKey, string $default = 'd
         }
 
 
-        if ($style === 'default' && function_exists('rx_kb_guess_style_from_text')
-            && (!function_exists('rx_kb_use_defaults') || rx_kb_use_defaults())) {
+        if ($rxUseDefaults && $style === 'default' && function_exists('rx_kb_guess_style_from_text')) {
             $guessed = rx_kb_guess_style_from_text($text);
             $style = ($guessed !== null && in_array($guessed, $allowed, true)) ? $guessed : 'primary';
         }
     }
 
-    if (!in_array($style, $allowed, true)) { $style = $default; }
+    if (!in_array($style, $allowed, true)) { $style = $rxUseDefaults ? $default : 'default'; }
 
     $btn = [
         'text' => $text,

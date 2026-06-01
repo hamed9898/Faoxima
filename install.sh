@@ -261,68 +261,6 @@ init_logging
 log_info "Faoxima installer ${FAOXIMA_VERSION} initialized (PID $$)"
 
 # ============================================================================
-#  TOKEN GENERATION (admin panel token)
-# ============================================================================
-# Generate a 48-character hex token (24 random bytes).
-faoxima_generate_token() {
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 24
-    else
-        # Fallback — read from /dev/urandom.
-        head -c 24 /dev/urandom | xxd -p -c 24
-    fi
-}
-
-# Display the generated token in a highlighted panel and require the user
-# to type 'y' (or 'yes') to confirm they have copied/saved it before continuing.
-faoxima_show_and_confirm_token() {
-    local token="$1" reply
-    printf '\n'
-    ui_panel "ADMIN PANEL TOKEN — SAVE THIS NOW" "$C_BOLD$C_RED" "$C_RED" \
-        "${C_YELLOW}This token has been auto-generated and saved to:${C_RESET}" \
-        "${C_DIM}  ${BOT_DIR}/config.php  →  \$admin_panel_token${C_RESET}" \
-        "" \
-        "${C_WHITE}${C_BOLD}${token}${C_RESET}" \
-        "" \
-        "${C_DIM}Copy it now to a password manager or secure note —${C_RESET}" \
-        "${C_DIM}you'll need it again if you re-run the bot setup.${C_RESET}"
-    ui_tip "Once saved, press ${C_BOLD}y${C_RESET}${C_GREEN} (or yes)${C_RESET}${C_GREEN} to continue.${C_RESET}"
-
-    while true; do
-        printf '\n  %s❯%s Have you copied and saved the token securely? [y/N]: ' "$C_YELLOW" "$C_RESET"
-        read -r reply
-        case "${reply,,}" in
-            y|yes)
-                ui_ok "Token saved confirmation received. Continuing..."
-                printf '\n'
-                return 0
-                ;;
-            n|no|"")
-                ui_warn "Please save the token before continuing."
-                ;;
-            *)
-                ui_warn "Please answer 'y' (yes) or 'n' (no)."
-                ;;
-        esac
-    done
-}
-
-# Insert/replace the $admin_panel_token line inside config.php.
-# If the variable already exists it is replaced; otherwise it's appended
-# right after the opening <?php tag.
-faoxima_persist_token() {
-    local config_path="$1" token="$2"
-    [ -f "$config_path" ] || return 1
-
-    if grep -q '^\$admin_panel_token' "$config_path"; then
-        sed -i "s|^\$admin_panel_token\s*=.*|\$admin_panel_token = '${token}';|" "$config_path"
-    else
-        # Insert after the first <?php line.
-        sed -i "0,/^<?php/{s|^<?php|<?php\n\$admin_panel_token = '${token}';|}" "$config_path"
-    fi
-}
-
-# ============================================================================
 #  ANIMATIONS — kept light and skippable on slow terminals
 # ============================================================================
 type_text() {
@@ -1258,9 +1196,8 @@ EOF
     fi
     sleep 1
 
-    local secrettoken admin_panel_token
+    local secrettoken
     secrettoken=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
-    admin_panel_token=$(faoxima_generate_token)
 
     local ASAS='$'
     cat > "$file_path" <<EOF
@@ -1273,7 +1210,6 @@ ${ASAS}domainhosts = '${YOUR_DOMAIN}/faoxima';
 ${ASAS}adminnumber = '${YOUR_CHAT_ID}';
 ${ASAS}usernamebot = '${YOUR_BOTNAME}';
 ${ASAS}secrettoken = '${secrettoken}';
-${ASAS}admin_panel_token = '${admin_panel_token}';
 ${ASAS}connect = mysqli_connect('localhost', \$usernamedb, \$passworddb, \$dbname);
 if (${ASAS}connect->connect_error) {
     die(' The connection to the database failed:' . ${ASAS}connect->connect_error);
@@ -1294,11 +1230,6 @@ try {
 EOF
     sleep 1
 
-    # ── Show admin panel token + require user confirmation ─────────────────
-    clear
-    show_logo
-    faoxima_show_and_confirm_token "$admin_panel_token"
-
     # ── Telegram webhook + first message ───────────────────────────────────
     curl -F "url=https://${YOUR_DOMAIN}/faoxima/index.php" \
          -F "secret_token=${secrettoken}" \
@@ -1316,9 +1247,9 @@ EOF
     sleep 1
     systemctl start apache2 || { ui_err "Failed to start Apache 2."; exit 1; }
 
-    # ── Trigger table.php with the admin panel token ───────────────────────
-    local table_url="https://${YOUR_DOMAIN}/faoxima/table.php?token=$(printf '%s' "$admin_panel_token" | sed 's/&/%26/g')"
-    ui_action "Initialising database tables via table.php (with token)..."
+    # ── Trigger table.php to initialise the database tables ────────────────
+    local table_url="https://${YOUR_DOMAIN}/faoxima/table.php"
+    ui_action "Initialising database tables via table.php..."
     curl -s "$table_url" >/dev/null || {
         ui_warn "Failed to fetch ${table_url} — please open it manually in a browser."
     }
@@ -1332,8 +1263,7 @@ EOF
         "phpMyAdmin|${C_BLUE}https://${YOUR_DOMAIN}/phpmyadmin${C_RESET}" \
         "Database name|${C_CYAN}${dbname}${C_RESET}" \
         "Database user|${C_CYAN}${dbuser}${C_RESET}" \
-        "Database password|${C_CYAN}${dbpass}${C_RESET}" \
-        "Admin panel token|${C_YELLOW}${admin_panel_token}${C_RESET}"
+        "Database password|${C_CYAN}${dbpass}${C_RESET}"
     ui_tip "Run 'faoxima' anytime from the shell to reopen this menu."
     printf '\n'
 
@@ -1662,9 +1592,8 @@ EOF
         read -r YOUR_BOTNAME
     done
 
-    local secrettoken admin_panel_token ASAS='$'
+    local secrettoken ASAS='$'
     secrettoken=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
-    admin_panel_token=$(faoxima_generate_token)
 
     cat > "${BOT_DIR}/config.php" <<EOF
 <?php
@@ -1676,7 +1605,6 @@ ${ASAS}domainhosts = '${YOUR_DOMAIN}';
 ${ASAS}adminnumber = '${YOUR_CHAT_ID}';
 ${ASAS}usernamebot = '${YOUR_BOTNAME}';
 ${ASAS}secrettoken = '${secrettoken}';
-${ASAS}admin_panel_token = '${admin_panel_token}';
 
 ${ASAS}connect = mysqli_connect('127.0.0.1', \$usernamedb, \$passworddb, \$dbname);
 if (${ASAS}connect->connect_error) {
@@ -1698,11 +1626,6 @@ try {
 ?>
 EOF
 
-    # ── Show & confirm token ───────────────────────────────────────────────
-    clear
-    show_logo
-    faoxima_show_and_confirm_token "$admin_panel_token"
-
     # ── Webhook + first message (fixed: was using BOT_TOKEN/CHAT_ID before) ─
     curl -F "url=https://${YOUR_DOMAIN}/faoxima/index.php" \
          -F "secret_token=${secrettoken}" \
@@ -1718,8 +1641,8 @@ EOF
         return 1
     }
 
-    local TABLE_SETUP_URL="https://${YOUR_DOMAIN}/faoxima/table.php?token=$(printf '%s' "$admin_panel_token" | sed 's/&/%26/g')"
-    ui_action "Setting up database tables (with token)..."
+    local TABLE_SETUP_URL="https://${YOUR_DOMAIN}/faoxima/table.php"
+    ui_action "Setting up database tables..."
     curl -s "$TABLE_SETUP_URL" >/dev/null || {
         ui_warn "Failed to fetch ${TABLE_SETUP_URL} — please open it manually in a browser."
     }
@@ -1733,8 +1656,7 @@ EOF
         "phpMyAdmin|${C_BLUE}https://${DOMAIN_NAME}/phpmyadmin${C_RESET}" \
         "Database name|${C_CYAN}${dbname}${C_RESET}" \
         "Database user|${C_CYAN}${dbuser}${C_RESET}" \
-        "Database password|${C_CYAN}${dbpass}${C_RESET}" \
-        "Admin panel token|${C_YELLOW}${admin_panel_token}${C_RESET}"
+        "Database password|${C_CYAN}${dbpass}${C_RESET}"
     ui_tip "Run 'faoxima' anytime from the shell to reopen this menu."
     printf '\n'
 
@@ -1811,21 +1733,12 @@ update_bot() {
     if [ -z "$URL" ]; then
         URL=$(grep "domainhosts" "$CONFIG_PATH" | sed -n "s/.*domainhosts.*=.*[\'\"]\([^\'\"]*\)[\'\"].*/\1/p" | head -1)
     fi
-    # Re-use the existing admin_panel_token (or mint a new one if missing).
-    local admin_panel_token
-    admin_panel_token=$(grep '^\$admin_panel_token' "$CONFIG_PATH" 2>/dev/null | cut -d"'" -f2)
-    if [ -z "$admin_panel_token" ]; then
-        admin_panel_token=$(faoxima_generate_token)
-        faoxima_persist_token "$CONFIG_PATH" "$admin_panel_token"
-        ui_info "No admin panel token found in config.php — a new one was generated."
-        faoxima_show_and_confirm_token "$admin_panel_token"
-    fi
 
     if [ -n "$URL" ]; then
         CLEAN_URL=${URL#http://}
         CLEAN_URL=${CLEAN_URL#https://}
         CLEAN_URL=${CLEAN_URL%/}
-        curl -s "https://${CLEAN_URL}/table.php?token=$(printf '%s' "$admin_panel_token" | sed 's/&/%26/g')" >/dev/null || {
+        curl -s "https://${CLEAN_URL}/table.php" >/dev/null || {
             ui_warn "Setup script execution failed for https://${CLEAN_URL}/table.php"
         }
     else
@@ -2892,9 +2805,8 @@ EOF
     mysql -u "$ROOT_USER" -p"$ROOT_PASS" -e "FLUSH PRIVILEGES;"
 
     local CONFIG_FILE="${BOT_PATH}/config.php"
-    local secrettoken admin_panel_token
+    local secrettoken
     secrettoken=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
-    admin_panel_token=$(faoxima_generate_token)
 
     ui_action "Writing config.php..."
     cat > "$CONFIG_FILE" <<EOF
@@ -2907,7 +2819,6 @@ EOF
 \$adminnumber = '${CHAT_ID}';
 \$usernamebot = '${BOT_NAME}';
 \$secrettoken = '${secrettoken}';
-\$admin_panel_token = '${admin_panel_token}';
 \$connect = mysqli_connect('localhost', \$usernamedb, \$passworddb, \$dbname);
 if (\$connect->connect_error) {
     die('Database connection failed: ' . \$connect->connect_error);
@@ -2929,11 +2840,6 @@ EOF
     sleep 1
     chown -R www-data:www-data "$BOT_PATH"
     chmod -R 755 "$BOT_PATH"
-
-    # Show admin panel token + user confirmation BEFORE we hit table.php.
-    clear
-    show_logo
-    faoxima_show_and_confirm_token "$admin_panel_token"
 
     ui_action "Setting webhook for bot..."
     curl -F "url=https://${DOMAIN_NAME}/${BOT_NAME}/index.php" \
@@ -2957,8 +2863,8 @@ EOF
     fi
     grant_file_permissions "$BOT_PATH"
 
-    local TABLE_SETUP_URL="https://${DOMAIN_NAME}/${BOT_NAME}/table.php?token=$(printf '%s' "$admin_panel_token" | sed 's/&/%26/g')"
-    ui_action "Setting up database tables (with token)..."
+    local TABLE_SETUP_URL="https://${DOMAIN_NAME}/${BOT_NAME}/table.php"
+    ui_action "Setting up database tables..."
     curl -s "$TABLE_SETUP_URL" >/dev/null || \
         ui_warn "Failed to fetch ${TABLE_SETUP_URL} — please open it manually in a browser."
 
@@ -2977,8 +2883,7 @@ EOF
         "phpMyAdmin|${C_BLUE}https://${DOMAIN_NAME}/phpmyadmin${C_RESET}" \
         "Database name|${C_CYAN}${DB_NAME}${C_RESET}" \
         "Database user|${C_CYAN}${DB_USERNAME}${C_RESET}" \
-        "Database password|${C_CYAN}${DB_PASSWORD}${C_RESET}" \
-        "Admin panel token|${C_YELLOW}${admin_panel_token}${C_RESET}"
+        "Database password|${C_CYAN}${DB_PASSWORD}${C_RESET}"
     printf '\n'
 }
 
@@ -3016,21 +2921,14 @@ update_additional_bot() {
     chown -R www-data:www-data "$BOT_PATH"
     chmod -R 755 "$BOT_PATH"
 
-    local URL admin_panel_token
+    local URL
     URL=$(grep '\$domainhosts' "$CONFIG_PATH" | cut -d"'" -f2)
     if [ -z "$URL" ]; then
         ui_err "Failed to extract domain URL from config.php."
         return 1
     fi
-    admin_panel_token=$(grep '^\$admin_panel_token' "$CONFIG_PATH" | cut -d"'" -f2)
-    if [ -z "$admin_panel_token" ]; then
-        admin_panel_token=$(faoxima_generate_token)
-        faoxima_persist_token "$CONFIG_PATH" "$admin_panel_token"
-        ui_info "No admin panel token found — a new one was generated."
-        faoxima_show_and_confirm_token "$admin_panel_token"
-    fi
 
-    if ! curl -s "https://${URL}/table.php?token=$(printf '%s' "$admin_panel_token" | sed 's/&/%26/g')" >/dev/null; then
+    if ! curl -s "https://${URL}/table.php" >/dev/null; then
         ui_warn "Failed to execute table.php — please verify manually."
     fi
     ui_ok "${SELECTED_BOT} has been successfully updated."

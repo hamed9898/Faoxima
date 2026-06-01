@@ -2529,11 +2529,16 @@ $textconnect
         sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
         return;
     }
-    $stmt = $pdo->prepare("SELECT * FROM DiscountSell WHERE (code_product = :code_product OR code_product = 'all') AND (code_panel = :code_panel OR code_panel = '/all') AND codeDiscount = :codeDiscount AND (agent = :agent OR agent = 'allusers') AND (type = 'all' OR type = 'extend')");
+    if (intval($user['pricediscount']) != 0) {
+        sendmessage($from_id, "❌ شما تخفیف اختصاصی دارید و امکان استفاده از کد تخفیف وجود ندارد.", $backuser, 'HTML');
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT * FROM DiscountSell WHERE (code_product = :code_product OR code_product = 'all') AND (code_panel = :code_panel OR code_panel = '/all') AND codeDiscount = :codeDiscount AND (agent = :agent OR agent = 'allusers' OR agent = 'all') AND (type = 'all' OR type = 'extend') AND (status IS NULL OR status = '' OR status = 'active') AND (target_user IS NULL OR target_user = '' OR target_user = :uid)");
     $stmt->bindParam(':code_product', $userdate['code_product'], PDO::PARAM_STR);
     $stmt->bindParam(':code_panel', $marzban_list_get['code_panel'], PDO::PARAM_STR);
     $stmt->bindParam(':agent', $user['agent'], PDO::PARAM_STR);
     $stmt->bindParam(':codeDiscount', $text, PDO::PARAM_STR);
+    $stmt->bindParam(':uid', $from_id, PDO::PARAM_STR);
     $stmt->execute();
     $SellDiscountlimit = $stmt->fetch(PDO::FETCH_ASSOC);
     $stmt = $pdo->prepare("SELECT * FROM Giftcodeconsumed WHERE id_user = :from_id AND code = :code");
@@ -2549,7 +2554,7 @@ $textconnect
         sendmessage($from_id, $textbotlang['Admin']['Discount']['invalidcodedis'], null, 'HTML');
         return;
     }
-    if (($SellDiscountlimit['limitDiscount'] <= $SellDiscountlimit['usedDiscount'])) {
+    if (intval($SellDiscountlimit['limitDiscount']) > 0 && intval($SellDiscountlimit['usedDiscount']) >= intval($SellDiscountlimit['limitDiscount'])) {
         sendmessage($from_id, $textbotlang['users']['Discount']['erorrlimit'], null, 'HTML');
         return;
     }
@@ -2566,7 +2571,11 @@ $textconnect
             return;
         }
     }
-    sendmessage($from_id, "🤩 کد تخفیف شما درست بود و  {$SellDiscountlimit['price']} درصد تخفیف روی فاکتور شما اعمال شد.", $keyboard, 'HTML');
+    $__dvt = strtolower(trim((string)($SellDiscountlimit['value_type'] ?? '')));
+    if (!in_array($__dvt, ['percent', 'amount', 'free'], true)) $__dvt = 'percent';
+    $__dval = (float)$SellDiscountlimit['price'];
+    $__dlabel = $__dvt === 'free' ? 'رایگان' : ($__dvt === 'amount' ? number_format($__dval) . ' تومان' : $SellDiscountlimit['price'] . ' درصد');
+    sendmessage($from_id, "🤩 کد تخفیف شما درست بود و تخفیف {$__dlabel} روی فاکتور شما اعمال شد.", $keyboard, 'HTML');
     $eextraprice = json_decode($marzban_list_get['pricecustomvolume'], true);
     $custompricevalue = $eextraprice[$user['agent']];
     $eextraprice = json_decode($marzban_list_get['pricecustomtime'], true);
@@ -2585,8 +2594,14 @@ $textconnect
         $stmt->execute();
         $info_product = $stmt->fetch(PDO::FETCH_ASSOC);
     }
-    $result = ($SellDiscountlimit['price'] / 100) * $info_product['price_product'];
-    $info_product['price_product'] = $info_product['price_product'] - $result;
+    if ($__dvt === 'free') {
+        $info_product['price_product'] = 0;
+    } elseif ($__dvt === 'amount') {
+        $info_product['price_product'] = $info_product['price_product'] - $__dval;
+    } else {
+        $result = ($__dval / 100) * $info_product['price_product'];
+        $info_product['price_product'] = $info_product['price_product'] - $result;
+    }
     $info_product['price_product'] = round($info_product['price_product']);
     if (intval($info_product['Service_time']) == 0)
         $info_product['Service_time'] = $textbotlang['users']['stateus']['Unlimited'];
@@ -3013,6 +3028,9 @@ $textconnect
         'inline_keyboard' => [
             [
                 ['text' => $textbotlang['users']['Extra_volume']['extracheck'], 'callback_data' => 'confirmaextra-' . $extrapricevalue * $text],
+            ],
+            [
+                ['text' => "🎁 ثبت کد تخفیف", 'callback_data' => 'discountvolume-' . $extrapricevalue * $text],
             ]
         ]
     ]);
@@ -3027,8 +3045,67 @@ $textconnect
 ✅ جهت پرداخت و اضافه شدن حجم، روی دکمه زیر کلیک کنید";
     sendmessage($from_id, $textextra, $keyboardsetting, 'HTML');
     step('home', $from_id);
-} elseif (preg_match('/confirmaextra-(\w+)/', $datain, $dataget)) {
-    $volume = $dataget[1];
+} elseif (preg_match('/discountvolume-(\w+)/', $datain, $dataget)) {
+    update("user", "Processing_value_four", "prevol_" . $dataget[1], "id", $from_id);
+    sendmessage($from_id, $textbotlang['users']['Discount']['getcodesell'], $backuser, 'HTML');
+    step('getcodesellDiscountvolume', $from_id);
+    deletemessage($from_id, $message_id);
+} elseif ($user['step'] == "getcodesellDiscountvolume") {
+    $nameloc = select("invoice", "*", "id_invoice", $user['Processing_value'], "select");
+    if (!is_array($nameloc) || (string)($nameloc['id_user'] ?? '') !== (string)$from_id) {
+        sendmessage($from_id, "❌ مراحل خرید حجم اضافه را مجددا انجام دهید", $keyboard, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
+    $__pv4 = (string)$user['Processing_value_four'];
+    $__baseVol = (strpos($__pv4, 'prevol_') === 0) ? intval(substr($__pv4, 7)) : 0;
+    if ($__baseVol <= 0) {
+        sendmessage($from_id, "❌ مراحل خرید حجم اضافه را مجددا انجام دهید", $keyboard, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    if (!in_array($text, $SellDiscount)) {
+        sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
+        return;
+    }
+    $dv = nm_validateSellDiscount($text, 'volume', '', $marzban_list_get['code_panel'], $user, $from_id);
+    if (empty($dv['ok'])) {
+        sendmessage($from_id, $dv['reason'], $backuser, 'HTML');
+        return;
+    }
+    $__discounted = (int)round(nm_applySellDiscountToPrice($dv['row'], $__baseVol));
+    if ($__discounted < 0) $__discounted = 0;
+    update("user", "Processing_value_four", "disv_" . $text . "_" . $__baseVol . "_" . $__discounted, "id", $from_id);
+    $__basefmt = number_format($__baseVol, 0);
+    $__disfmt  = number_format($__discounted, 0);
+    $keyboardsetting = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => $textbotlang['users']['Extra_volume']['extracheck'], 'callback_data' => 'confirmaextradiscount-' . $__baseVol],
+            ]
+        ]
+    ]);
+    $textextra = "🤩 کد تخفیف {$dv['label']} روی فاکتور شما اعمال شد.
+
+💰 مبلغ قبل از تخفیف : {$__basefmt} تومان
+💸 مبلغ قابل پرداخت : {$__disfmt} تومان
+
+✅ جهت پرداخت و اضافه شدن حجم، روی دکمه زیر کلیک کنید";
+    sendmessage($from_id, $textextra, $keyboardsetting, 'HTML');
+    step('home', $from_id);
+} elseif (preg_match('/confirmaextra(discount)?-(\w+)/', $datain, $dataget)) {
+    $volume = $dataget[2];
+    $__volDiscountCode = '';
+    $__volCharge = (float)$volume;
+    if (($dataget[1] ?? '') === 'discount') {
+        $__pv4 = (string)$user['Processing_value_four'];
+        if (strpos($__pv4, 'disv_') === 0) {
+            $__pp = explode('_', $__pv4);
+            $__volDiscountCode = $__pp[1] ?? '';
+            if (isset($__pp[3])) $__volCharge = (float)$__pp[3];
+        }
+    }
     $nameloc = select("invoice", "*", "id_invoice", $user['Processing_value'], "select");
     if (!in_array($nameloc['Status'], ['active', 'end_of_time', 'end_of_volume', 'sendedwarn', 'send_on_hold'])) {
         sendmessage($from_id, "❌ خرید با خطا مواجه گردید مراحل را مجدد انجام  دهید.", null, 'HTML');
@@ -3037,7 +3114,7 @@ $textconnect
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
     $eextraprice = json_decode($marzban_list_get['priceextravolume'], true);
     $extrapricevalue = $eextraprice[$user['agent']];
-    if ($user['Balance'] < $volume && $user['agent'] != "n2") {
+    if ($user['Balance'] < $__volCharge && $user['agent'] != "n2") {
         $marzbandirectpay = select('shopSetting', "*", "Namevalue", "statusdirectpabuy", "select")['value'];
         if ($marzbandirectpay == "offdirectbuy") {
             $minbalance = number_format(json_decode(select("PaySetting", "*", "NamePay", "minbalance", "select")['ValuePay'], true)[$user['agent']]);
@@ -3055,24 +3132,28 @@ $textconnect
         } else {
             $valuevolume = intval($volume) / intval($extrapricevalue);
             if (intval($user['pricediscount']) != 0) {
-                $result = ($volume * $user['pricediscount']) / 100;
-                $volume = $volume - $result;
+                $result = ($__volCharge * $user['pricediscount']) / 100;
+                $__volCharge = $__volCharge - $result;
                 sendmessage($from_id, sprintf($textbotlang['users']['Discount']['discountapplied'], $user['pricediscount']), null, 'HTML');
             }
-            $Balance_prim = $volume - $user['Balance'];
+            $Balance_prim = $__volCharge - $user['Balance'];
             update("user", "Processing_value", $Balance_prim, "id", $from_id);
             Editmessagetext($from_id, $message_id, $textbotlang['users']['sell']['None-credit'], $step_payment);
             step('get_step_payment', $from_id);
             update("user", "Processing_value_one", "{$nameloc['username']}%{$valuevolume}", "id", $from_id);
             update("user", "Processing_value_tow", "getextravolumeuser", "id", $from_id);
+            if ($__volDiscountCode !== '') {
+                nm_markSellDiscountUsed($__volDiscountCode, $from_id, $username, 'volume');
+                update("user", "Processing_value_four", "", "id", $from_id);
+            }
             return;
         }
     }
     deletemessage($from_id, $message_id);
-    $volumepricelast = $volume;
+    $volumepricelast = $__volCharge;
     if (intval($user['pricediscount']) != 0) {
-        $result = ($volume * $user['pricediscount']) / 100;
-        $volumepricelast = $volume - $result;
+        $result = ($__volCharge * $user['pricediscount']) / 100;
+        $volumepricelast = $__volCharge - $result;
         sendmessage($from_id, sprintf($textbotlang['users']['Discount']['discountapplied'], $user['pricediscount']), null, 'HTML');
     }
     if (intval($user['maxbuyagent']) != 0 and $user['agent'] == "n2") {
@@ -3082,12 +3163,20 @@ $textconnect
         }
     }
     $__allowNegVx = ($user['agent'] === 'n2') ? (int)($user['maxbuyagent'] ?? 0) : 0;
-    $__chargeVx = function_exists('balance_atomic_charge') ? balance_atomic_charge($from_id, $volumepricelast, $__allowNegVx) : ['ok' => false];
-    if (empty($__chargeVx['ok'])) {
-        sendmessage($from_id, "❌ موجودی کافی نیست (تلاش هم‌زمان شناسایی شد). یک بار دیگر تلاش کنید.", null, 'HTML');
-        return;
+    if ($volumepricelast > 0) {
+        $__chargeVx = function_exists('balance_atomic_charge') ? balance_atomic_charge($from_id, $volumepricelast, $__allowNegVx) : ['ok' => false];
+        if (empty($__chargeVx['ok'])) {
+            sendmessage($from_id, "❌ موجودی کافی نیست (تلاش هم‌زمان شناسایی شد). یک بار دیگر تلاش کنید.", null, 'HTML');
+            return;
+        }
+        $Balance_Low_user = $__chargeVx['new_balance'];
+    } else {
+        $Balance_Low_user = $user['Balance'];
     }
-    $Balance_Low_user = $__chargeVx['new_balance'];
+    if ($__volDiscountCode !== '') {
+        nm_markSellDiscountUsed($__volDiscountCode, $from_id, $username, 'volume');
+        update("user", "Processing_value_four", "", "id", $from_id);
+    }
     $DataUserOut = $ManagePanel->DataUser($nameloc['Service_location'], $nameloc['username']);
     $data_for_database = json_encode(array(
         'volume_value' => intval($volume) / intval($extrapricevalue),
@@ -3656,6 +3745,9 @@ $textconnect
         'inline_keyboard' => [
             [
                 ['text' => $textbotlang['users']['Extra_time']['extratimecheck'], 'callback_data' => 'confirmaextratime-' . $extratimepricevalue * $text],
+            ],
+            [
+                ['text' => "🎁 ثبت کد تخفیف", 'callback_data' => 'discounttime-' . $extratimepricevalue * $text],
             ]
         ]
     ]);
@@ -3670,9 +3762,68 @@ $textconnect
 ✅ جهت پرداخت و اضافه شدن زمان، روی دکمه زیر کلیک کنید";
     sendmessage($from_id, $textextra, $keyboardsetting, 'HTML');
     step('home', $from_id);
-} elseif (preg_match('/confirmaextratime-(\w+)/', $datain, $dataget)) {
-    $tmieextra = $dataget[1];
-    $pricelasttime = $tmieextra;
+} elseif (preg_match('/discounttime-(\w+)/', $datain, $dataget)) {
+    update("user", "Processing_value_four", "pretime_" . $dataget[1], "id", $from_id);
+    sendmessage($from_id, $textbotlang['users']['Discount']['getcodesell'], $backuser, 'HTML');
+    step('getcodesellDiscounttime', $from_id);
+    deletemessage($from_id, $message_id);
+} elseif ($user['step'] == "getcodesellDiscounttime") {
+    $nameloc = select("invoice", "*", "id_invoice", $user['Processing_value'], "select");
+    if (!is_array($nameloc) || (string)($nameloc['id_user'] ?? '') !== (string)$from_id) {
+        sendmessage($from_id, "❌ مراحل خرید زمان اضافه را مجددا انجام دهید", $keyboard, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
+    $__pv4 = (string)$user['Processing_value_four'];
+    $__baseTime = (strpos($__pv4, 'pretime_') === 0) ? intval(substr($__pv4, 8)) : 0;
+    if ($__baseTime <= 0) {
+        sendmessage($from_id, "❌ مراحل خرید زمان اضافه را مجددا انجام دهید", $keyboard, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    if (!in_array($text, $SellDiscount)) {
+        sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], $backuser, 'HTML');
+        return;
+    }
+    $dv = nm_validateSellDiscount($text, 'time', '', $marzban_list_get['code_panel'], $user, $from_id);
+    if (empty($dv['ok'])) {
+        sendmessage($from_id, $dv['reason'], $backuser, 'HTML');
+        return;
+    }
+    $__discounted = (int)round(nm_applySellDiscountToPrice($dv['row'], $__baseTime));
+    if ($__discounted < 0) $__discounted = 0;
+    update("user", "Processing_value_four", "distime_" . $text . "_" . $__baseTime . "_" . $__discounted, "id", $from_id);
+    $__basefmt = number_format($__baseTime, 0);
+    $__disfmt  = number_format($__discounted, 0);
+    $keyboardsetting = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => $textbotlang['users']['Extra_time']['extratimecheck'], 'callback_data' => 'confirmaextratimediscount-' . $__baseTime],
+            ]
+        ]
+    ]);
+    $textextra = "🤩 کد تخفیف {$dv['label']} روی فاکتور شما اعمال شد.
+
+💰 مبلغ قبل از تخفیف : {$__basefmt} تومان
+💸 مبلغ قابل پرداخت : {$__disfmt} تومان
+
+✅ جهت پرداخت و اضافه شدن زمان، روی دکمه زیر کلیک کنید";
+    sendmessage($from_id, $textextra, $keyboardsetting, 'HTML');
+    step('home', $from_id);
+} elseif (preg_match('/confirmaextratime(discount)?-(\w+)/', $datain, $dataget)) {
+    $tmieextra = $dataget[2];
+    $__timeDiscountCode = '';
+    $__timeCharge = (float)$tmieextra;
+    if (($dataget[1] ?? '') === 'discount') {
+        $__pv4 = (string)$user['Processing_value_four'];
+        if (strpos($__pv4, 'distime_') === 0) {
+            $__pp = explode('_', $__pv4);
+            $__timeDiscountCode = $__pp[1] ?? '';
+            if (isset($__pp[3])) $__timeCharge = (float)$__pp[3];
+        }
+    }
+    $pricelasttime = $__timeCharge;
     $nameloc = select("invoice", "*", "id_invoice", $user['Processing_value'], "select");
     if (!in_array($nameloc['Status'], ['active', 'end_of_time', 'end_of_volume', 'sendedwarn', 'send_on_hold'])) {
         sendmessage($from_id, "❌ خرید با خطا مواجه گردید مراحل را مجدد انجام  دهید.", null, 'HTML');
@@ -3681,7 +3832,7 @@ $textconnect
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
     $eextraprice = json_decode($marzban_list_get['priceextratime'], true);
     $extratimepricevalue = $eextraprice[$user['agent']];
-    if ($user['Balance'] < $tmieextra && $user['agent'] != "n2") {
+    if ($user['Balance'] < $__timeCharge && $user['agent'] != "n2") {
         $marzbandirectpay = select('shopSetting', "*", "Namevalue", "statusdirectpabuy", "select")['value'];
         if ($marzbandirectpay == "offdirectbuy") {
             $minbalance = number_format(json_decode(select("PaySetting", "*", "NamePay", "minbalance", "select")['ValuePay'], true)[$user['agent']]);
@@ -3699,8 +3850,8 @@ $textconnect
         } else {
             $valuetime = $tmieextra / $extratimepricevalue;
             if (intval($user['pricediscount']) != 0) {
-                $result = ($tmieextra * $user['pricediscount']) / 100;
-                $pricelasttime = $tmieextra - $result;
+                $result = ($__timeCharge * $user['pricediscount']) / 100;
+                $pricelasttime = $__timeCharge - $result;
                 sendmessage($from_id, sprintf($textbotlang['users']['Discount']['discountapplied'], $user['pricediscount']), null, 'HTML');
             }
             if (intval($pricelasttime) != 0) {
@@ -3710,14 +3861,18 @@ $textconnect
                 step('get_step_payment', $from_id);
                 update("user", "Processing_value_one", "{$nameloc['username']}%{$valuetime}", "id", $from_id);
                 update("user", "Processing_value_tow", "getextratimeuser", "id", $from_id);
+                if ($__timeDiscountCode !== '') {
+                    nm_markSellDiscountUsed($__timeDiscountCode, $from_id, $username, 'time');
+                    update("user", "Processing_value_four", "", "id", $from_id);
+                }
                 return;
             }
         }
     }
     deletemessage($from_id, $message_id);
     if (intval($user['pricediscount']) != 0 and intval($pricelasttime) != 0) {
-        $result = ($tmieextra * $user['pricediscount']) / 100;
-        $pricelasttime = $tmieextra - $result;
+        $result = ($__timeCharge * $user['pricediscount']) / 100;
+        $pricelasttime = $__timeCharge - $result;
         sendmessage($from_id, sprintf($textbotlang['users']['Discount']['discountapplied'], $user['pricediscount']), null, 'HTML');
     }
     $Balance_Low_user = $user['Balance'] - $pricelasttime;
@@ -3729,13 +3884,21 @@ $textconnect
     }
 
     $__allowNegEt = ($user['agent'] === 'n2') ? (int)($user['maxbuyagent'] ?? 0) : 0;
-    $__chargeEt = function_exists('balance_atomic_charge') ? balance_atomic_charge($from_id, $pricelasttime, $__allowNegEt) : ['ok' => false];
-    if (empty($__chargeEt['ok'])) {
-        sendmessage($from_id, "❌ موجودی کافی نیست (تلاش هم‌زمان شناسایی شد). یک بار دیگر تلاش کنید.", null, 'HTML');
-        return;
+    if ($pricelasttime > 0) {
+        $__chargeEt = function_exists('balance_atomic_charge') ? balance_atomic_charge($from_id, $pricelasttime, $__allowNegEt) : ['ok' => false];
+        if (empty($__chargeEt['ok'])) {
+            sendmessage($from_id, "❌ موجودی کافی نیست (تلاش هم‌زمان شناسایی شد). یک بار دیگر تلاش کنید.", null, 'HTML');
+            return;
+        }
+        $Balance_Low_user = $__chargeEt['new_balance'];
+    } else {
+        $Balance_Low_user = $user['Balance'];
     }
-    $Balance_Low_user = $__chargeEt['new_balance'];
     $__chargedEtUser = true;
+    if ($__timeDiscountCode !== '') {
+        nm_markSellDiscountUsed($__timeDiscountCode, $from_id, $username, 'time');
+        update("user", "Processing_value_four", "", "id", $from_id);
+    }
     update("invoice", "Status", "active", "id_invoice", $nameloc['id_invoice']);
     $extratimeday = $tmieextra / $extratimepricevalue;
     $DataUserOut = $ManagePanel->DataUser($nameloc['Service_location'], $nameloc['username']);

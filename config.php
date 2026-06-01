@@ -4,8 +4,6 @@ $dbname     = '';
 $usernamedb = '';
 $passworddb = '';
 
-$admin_panel_token = '';
-
 
 $connect = null;
 $pdo     = null;
@@ -80,6 +78,5 @@ $GLOBALS['domainhosts']                = $domainhosts;
 $GLOBALS['usernamebot']                = $usernamebot;
 $GLOBALS['telegramCurlTimeout']        = $telegramCurlTimeout;
 $GLOBALS['telegramStrictIpValidation'] = $telegramStrictIpValidation;
-$GLOBALS['admin_panel_token']          = $admin_panel_token;
 
 require_once __DIR__ . '/proxy.php';

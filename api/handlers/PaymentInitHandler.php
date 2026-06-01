@@ -4,12 +4,15 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/BaseHandler.php';
+require_once __DIR__ . '/DiscountSupport.php';
 
 final class PaymentInitHandler extends BaseHandler
 {
 
 
     private const STALE_UNPAID_MINUTES = 15;
+
+    private int $chargeBonus = 0;
 
     public function handle(): void
     {
@@ -96,6 +99,23 @@ final class PaymentInitHandler extends BaseHandler
             $this->user['Processing_value_one'] = $purchaseUsername;
             $this->user['Processing_value_tow'] = 'getconfigafterpay';
         } else {
+            $chargeCode = FaoximaInput::string($this->data, 'discount_code');
+            if ($chargeCode !== '') {
+                $dv = MiniDiscount::validateSell($chargeCode, 'charge', '', '', $this->user);
+                if (empty($dv['ok'])) {
+                    FaoximaResponse::fail(422, (string)($dv['reason'] ?? '❌ کد تخفیف نامعتبر است.'));
+                }
+                $gatewayAmount = (int) round(MiniDiscount::applyToPrice($dv['row'], (float)$amount));
+                if ($gatewayAmount <= 0) {
+                    FaoximaResponse::fail(422, '❌ این کد برای شارژ قابل استفاده نیست (مبلغ پرداختی صفر می‌شود).');
+                }
+                $this->chargeBonus = $amount - $gatewayAmount;
+                if ($this->chargeBonus < 0) $this->chargeBonus = 0;
+                $amount = $gatewayAmount;
+                update('user', 'Processing_value', $amount, 'id', $this->user['id']);
+                $this->user['Processing_value'] = $amount;
+                MiniDiscount::markSellUsed($chargeCode, $this->user);
+            }
             update('user', 'Processing_value_one', '', 'id', $this->user['id']);
             update('user', 'Processing_value_tow', '', 'id', $this->user['id']);
             $this->user['Processing_value_one'] = '';
@@ -528,42 +548,34 @@ final class PaymentInitHandler extends BaseHandler
         $invoice = ($this->user['Processing_value_tow'] ?? '') . '|' . ($this->user['Processing_value_one'] ?? '');
         $now = date('Y/m/d H:i:s');
 
+        $cols = ['id_user', 'id_order', 'time', 'price', 'payment_Status', 'Payment_Method', 'id_invoice', 'source'];
+        $vals = [':u', ':o', ':t', ':p', ':s', ':m', ':i', ':src'];
+        $params = [
+            ':u'   => $this->user['id'],
+            ':o'   => $orderId,
+            ':t'   => $now,
+            ':p'   => $amount,
+            ':s'   => 'Unpaid',
+            ':m'   => $method,
+            ':i'   => $invoice,
+            ':src' => 'miniapp',
+        ];
+        if ($extId !== null) {
+            $cols[] = 'dec_not_confirmed';
+            $vals[] = ':ext';
+            $params[':ext'] = $extId;
+        }
+        if ($this->chargeBonus > 0) {
+            $cols[] = 'charge_bonus';
+            $vals[] = ':cb';
+            $params[':cb'] = $this->chargeBonus;
+        }
+
         try {
             $pdo = FaoximaDb::pdo();
-            if ($extId === null) {
-                $stmt = $pdo->prepare(
-                    'INSERT INTO Payment_report
-                        (id_user, id_order, time, price, payment_Status, Payment_Method, id_invoice, source)
-                     VALUES (:u, :o, :t, :p, :s, :m, :i, :src)'
-                );
-                $stmt->execute([
-                    ':u'   => $this->user['id'],
-                    ':o'   => $orderId,
-                    ':t'   => $now,
-                    ':p'   => $amount,
-                    ':s'   => 'Unpaid',
-                    ':m'   => $method,
-                    ':i'   => $invoice,
-                    ':src' => 'miniapp',
-                ]);
-            } else {
-                $stmt = $pdo->prepare(
-                    'INSERT INTO Payment_report
-                        (id_user, id_order, time, price, payment_Status, Payment_Method, id_invoice, dec_not_confirmed, source)
-                     VALUES (:u, :o, :t, :p, :s, :m, :i, :ext, :src)'
-                );
-                $stmt->execute([
-                    ':u'   => $this->user['id'],
-                    ':o'   => $orderId,
-                    ':t'   => $now,
-                    ':p'   => $amount,
-                    ':s'   => 'Unpaid',
-                    ':m'   => $method,
-                    ':i'   => $invoice,
-                    ':ext' => $extId,
-                    ':src' => 'miniapp',
-                ]);
-            }
+            $sql = 'INSERT INTO Payment_report (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
         } catch (Throwable $e) {
             FaoximaLogger::warn('Payment_report insert failed', ['err' => $e->getMessage(), 'has_ext' => $extId !== null]);
         }

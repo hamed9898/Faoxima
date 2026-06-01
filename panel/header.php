@@ -97,7 +97,7 @@ if (is_file($__schemaLib) && is_readable($__schemaLib)) {
 
 
         var color = localStorage.getItem('faoxima_color') || 'blue';
-        var theme = localStorage.getItem('faoxima_theme') || 'dark';
+        var theme = 'dark';
         var html = document.documentElement;
         if (!html.getAttribute('data-color')) html.setAttribute('data-color', color);
         if (!html.getAttribute('data-theme')) html.setAttribute('data-theme', theme);
@@ -154,13 +154,6 @@ if (is_file($__schemaLib) && is_readable($__schemaLib)) {
 
             <hr>
 
-            <button id="theme-toggle" type="button">
-                <span id="theme-toggle-icon"><?php echo icon('moon', 'svg-icon svg-sm'); ?></span>
-                <span id="theme-toggle-label">حالت روز</span>
-            </button>
-
-            <hr>
-
             <a href="login.php" class="menu-danger">
                 <?php echo icon('arrow-right-from-bracket', 'svg-icon svg-sm'); ?>
                 <span>خروج از حساب</span>
@@ -178,7 +171,7 @@ if (is_file($__schemaLib) && is_readable($__schemaLib)) {
         <li><a href="service.php"><span class="menu-symbol"><?php echo icon('package', 'svg-icon svg-sm'); ?></span><span>سرویس‌ها</span></a></li>
         <li><a href="product.php"><span class="menu-symbol"><?php echo icon('grid', 'svg-icon svg-sm'); ?></span><span>محصولات</span></a></li>
         <li><a href="payment.php"><span class="menu-symbol"><?php echo icon('wallet', 'svg-icon svg-sm'); ?></span><span>تراکنش‌ها</span></a></li>
-        <li><a href="cancelService.php"><span class="menu-symbol"><?php echo icon('ban', 'svg-icon svg-sm'); ?></span><span>درخواست لغو</span></a></li>
+        <li><a href="cancelService.php"><span class="menu-symbol"><?php echo icon('list', 'svg-icon svg-sm'); ?></span><span>لیست درخواست‌ها</span></a></li>
     </ul>
 
     <div class="sidebar-section-label">مدیریت</div>

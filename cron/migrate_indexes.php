@@ -19,42 +19,6 @@ require_once $root . '/config.php';
 require_once $root . '/function.php';
 
 
-(function () {
-    if (php_sapi_name() === 'cli') return;
-    $remote = $_SERVER['REMOTE_ADDR'] ?? '';
-    $localIps = ['127.0.0.1', '::1', $_SERVER['SERVER_ADDR'] ?? ''];
-    if ($remote !== '' && in_array($remote, $localIps, true)) return;
-
-    $providedToken = (string) ($_GET['token'] ?? $_REQUEST['token'] ?? '');
-    if ($providedToken !== '' && function_exists('hash_equals')) {
-        if (isset($GLOBALS['admin_panel_token']) && is_string($GLOBALS['admin_panel_token'])
-            && trim($GLOBALS['admin_panel_token']) !== ''
-            && hash_equals(trim($GLOBALS['admin_panel_token']), $providedToken)) {
-            return;
-        }
-        try {
-            global $pdo;
-            if (isset($pdo) && $pdo instanceof PDO) {
-                $stmt = $pdo->query("SELECT password FROM admin");
-                if ($stmt) {
-                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $stored = (string) ($row['password'] ?? '');
-                        if ($stored !== '' && hash_equals($stored, $providedToken)) {
-                            return;
-                        }
-                    }
-                }
-            }
-        } catch (Throwable $e) {}
-    }
-
-    http_response_code(404);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html><head><title>Not Found</title></head><body><h1>Not Found</h1></body></html>';
-    exit;
-})();
-
-
 global $pdo;
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     if (function_exists('getDatabaseConnection')) {

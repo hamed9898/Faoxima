@@ -32,26 +32,12 @@ $installType = 'simple';
 $serverType  = 'cpanel';
 $hasDbBackup = 'no';
 $currentStep = 1;
-$installFieldTotal = 8;
+$installFieldTotal = 7;
 $currentInstallField = isset($uPOST['current_install_field']) ? (int)$uPOST['current_install_field'] : 1;
 $currentStep = 1;
 $currentInstallField = max(1, min($installFieldTotal, $currentInstallField));
 
 
-$adminPanelToken = trim((string)($uPOST['admin_panel_token'] ?? ''));
-if ($adminPanelToken === '' || !preg_match('/^[a-f0-9]{32,64}$/', $adminPanelToken)) {
-    try {
-        $adminPanelToken = bin2hex(random_bytes(24));
-    } catch (\Throwable $tokenGenError) {
-        $fallbackBytes = @openssl_random_pseudo_bytes(24);
-        if ($fallbackBytes === false || $fallbackBytes === '') {
-            $adminPanelToken = bin2hex(hash('sha256', uniqid('', true) . microtime(true) . mt_rand(), true));
-            $adminPanelToken = substr($adminPanelToken, 0, 48);
-        } else {
-            $adminPanelToken = bin2hex($fallbackBytes);
-        }
-    }
-}
 function isHttps() {
     return (
         ($_SERVER['REQUEST_SCHEME'] ?? 'http') === 'https' ||
@@ -119,8 +105,7 @@ if(isset($uPOST['submit']) && $uPOST['submit']) {
             '{API_KEY}' => $tgBotToken,
             '{admin_number}' => $tgAdminId,
             '{domain_name}' => $document['address'],
-            '{username_bot}' => $tgBot['details']['result']['username'],
-            '{admin_panel_token}' => $adminPanelToken
+            '{username_bot}' => $tgBot['details']['result']['username']
         ];
         $replacementCount = 0;
         $newConfigData = updateConfigValues($rawConfigData, $replacements, $replacementCount);
@@ -131,7 +116,7 @@ if(isset($uPOST['submit']) && $uPOST['submit']) {
         else {
             $baseAddress = rtrim($document['address'], '/');
 
-            $tableResult = getContents("https://".$baseAddress."/table.php?token=" . urlencode($adminPanelToken));
+            $tableResult = getContents("https://".$baseAddress."/table.php");
             $SUCCESS[] = "✅ جداول دیتابیس ایجاد/بروزرسانی شد";
             ensureAdminRecord($dbInfo, $tgAdminId);
             $SUCCESS[] = "✅ Webhook تنظیم شد";
@@ -818,44 +803,6 @@ function ensureAdminRecord($dbInfo, $adminNumber) {
         }
 
 
-        .token-display {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-strong);
-            border-radius: var(--radius-md);
-            padding: 14px 16px;
-            margin-top: 10px;
-            flex-wrap: wrap;
-            transition: border-color var(--transition);
-        }
-        .token-display:focus-within,
-        .token-display:hover {
-            border-color: var(--accent);
-        }
-        .token-display code {
-            flex: 1 1 240px;
-            color: var(--accent);
-            font-size: 13px;
-            word-break: break-all;
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
-            min-width: 0;
-            user-select: all;
-            -webkit-user-select: all;
-        }
-        .token-copy {
-            flex-shrink: 0;
-            padding: 8px 14px !important;
-            font-size: 13px !important;
-            min-width: 110px;
-            justify-content: center;
-        }
-        .token-copy.is-copied {
-            background: var(--accent);
-            color: var(--bg-base);
-            border-color: var(--accent);
-        }
         .checkbox-block {
             display: flex;
             align-items: center;
@@ -1111,24 +1058,6 @@ function ensureAdminRecord($dbInfo, $adminNumber) {
                         <svg><use href="#i-arrow-left"/></svg>
                     </a>
 
-                    
-                    <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-subtle);">
-                        <h3 style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                            <svg style="width: 18px; height: 18px; color: var(--accent);"><use href="#i-shield"/></svg>
-                            توکن دسترسی پنل ادمین شما
-                        </h3>
-                        <div class="token-display">
-                            <code id="success-token-value"><?php echo escapeHtml($adminPanelToken); ?></code>
-                            <button type="button" class="btn btn-secondary token-copy" id="success-token-copy-btn">
-                                <svg><use href="#i-copy"/></svg>
-                                <span>کپی</span>
-                            </button>
-                        </div>
-                        <p class="form-hint" style="margin-top: 10px;">
-                            این توکن همچنین در فایل <code>config.php</code> در متغیر <code>$admin_panel_token</code> ذخیره شده است.
-                        </p>
-                    </div>
-
                     <div class="success-message">
                         <p><strong>نصب با موفقیت تکمیل شد!</strong></p>
                         <p style="color: var(--text-muted); font-size: 13px;">پوشه‌ی <code>installer</code> به‌صورت خودکار در حال حذف است — برای امنیت سرور.</p>
@@ -1207,35 +1136,6 @@ function ensureAdminRecord($dbInfo, $adminNumber) {
                             </div>
                         </div>
 
-                        <div class="field-step <?php echo $currentInstallField === 8 ? 'is-active' : ''; ?>" data-field-step="8">
-                            <div class="form-field">
-                                <label class="form-label">
-                                    <svg><use href="#i-shield"/></svg>
-                                    توکن دسترسی پنل ادمین (ساخته شد)
-                                </label>
-                                <div class="token-display">
-                                    <code id="token-value"><?php echo escapeHtml($adminPanelToken); ?></code>
-                                    <button type="button" class="btn btn-secondary token-copy" id="token-copy-btn">
-                                        <svg><use href="#i-copy"/></svg>
-                                        <span>کپی توکن</span>
-                                    </button>
-                                </div>
-                                <p class="form-hint">
-                                    این توکن به‌صورت خودکار ساخته شد و در فایل <code>config.php</code> ذخیره خواهد شد. لطفاً نسخه‌ای از آن را برای دسترسی‌های بعدی نگه دارید.
-                                </p>
-                                <div class="warn-block" style="margin-top: 16px;">
-                                    <svg><use href="#i-warn"/></svg>
-                                    <div>
-                                        <strong>مهم:</strong> این توکن را در پسوردمنیجر یا فایلی امن کپی و ذخیره کنید. در صورت نیاز به اجرای مجدد می‌توانید همین توکن را استفاده نمایید.
-                                    </div>
-                                </div>
-                                <label class="checkbox-block" for="token-saved-confirm">
-                                    <input type="checkbox" id="token-saved-confirm" name="token_saved_confirm" value="1" required>
-                                    <span>تأیید می‌کنم که توکن را کپی کرده و در جای امنی ذخیره کرده‌ام.</span>
-                                </label>
-                            </div>
-                        </div>
-
                         <div class="field-progress">
                             <span>فیلد <span id="install-progress-text"><?php echo $currentInstallField; ?></span> از <?php echo $installFieldTotal; ?></span>
                             <div class="field-progress-bar">
@@ -1276,7 +1176,6 @@ function ensureAdminRecord($dbInfo, $adminNumber) {
 
                 <input type="hidden" name="current_step"          id="current_step"          value="<?php echo (int) $currentStep; ?>">
                 <input type="hidden" name="current_install_field" id="current_install_field" value="<?php echo (int) $currentInstallField; ?>">
-                <input type="hidden" name="admin_panel_token"     id="admin_panel_token"     value="<?php echo escapeHtml($adminPanelToken); ?>">
             </form>
         </main>
 
@@ -1470,68 +1369,11 @@ function ensureAdminRecord($dbInfo, $adminNumber) {
                     const fieldField = $('#current_install_field');
                     if (stepField)  stepField.value  = currentStep;
                     if (fieldField) fieldField.value = currentInstallField;
-
-
-                    const confirmCheckbox = $('#token-saved-confirm');
-                    if (confirmCheckbox && !confirmCheckbox.checked) {
-                        event.preventDefault();
-                        confirmCheckbox.reportValidity();
-                        confirmCheckbox.focus();
-                    }
                 });
             }
-
-
-            initTokenCopyButton('#token-copy-btn', '#token-value');
-            initTokenCopyButton('#success-token-copy-btn', '#success-token-value');
         });
 
 
-        function initTokenCopyButton(btnSelector, valueSelector) {
-            const btn = document.querySelector(btnSelector);
-            const valEl = document.querySelector(valueSelector);
-            if (!btn || !valEl) return;
-            btn.addEventListener('click', () => {
-                const text = (valEl.textContent || '').trim();
-                if (!text) return;
-                copyTextToClipboard(text)
-                    .then(() => flashCopied(btn))
-                    .catch(() => flashCopied(btn));
-            });
-        }
-
-        function copyTextToClipboard(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                return navigator.clipboard.writeText(text);
-            }
-            return new Promise((resolve, reject) => {
-                try {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    ta.setAttribute('readonly', '');
-                    ta.style.position = 'fixed';
-                    ta.style.opacity = '0';
-                    ta.style.left = '-9999px';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    ta.setSelectionRange(0, text.length);
-                    const ok = document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    ok ? resolve() : reject(new Error('execCommand failed'));
-                } catch (e) { reject(e); }
-            });
-        }
-
-        function flashCopied(btn) {
-            const labelEl = btn.querySelector('span');
-            const original = labelEl ? labelEl.textContent : '';
-            if (labelEl) labelEl.textContent = '✓ کپی شد';
-            btn.classList.add('is-copied');
-            setTimeout(() => {
-                if (labelEl) labelEl.textContent = original;
-                btn.classList.remove('is-copied');
-            }, 2000);
-        }
     })();
 </script>
 </body>
@@ -1681,7 +1523,6 @@ function updateConfigValues($configContents, array $placeholderValues, &$replace
         'adminnumber' => $placeholderValues['{admin_number}'] ?? '',
         'domainhosts' => $placeholderValues['{domain_name}'] ?? '',
         'usernamebot' => $placeholderValues['{username_bot}'] ?? '',
-        'admin_panel_token' => $placeholderValues['{admin_panel_token}'] ?? '',
     ];
     $updatedConfig = $configData;
     foreach ($variableMap as $variable => $value) {

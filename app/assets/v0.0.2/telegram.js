@@ -30,8 +30,9 @@ export function ready() {
         if (typeof w.expand === 'function') w.expand();
         if (typeof w.disableVerticalSwipes === 'function') w.disableVerticalSwipes();
 
-        if (typeof w.setHeaderColor === 'function') w.setHeaderColor('#0a0907');
-        if (typeof w.setBackgroundColor === 'function') w.setBackgroundColor('#0a0907');
+        var __chrome = '#eaedf8';
+        if (typeof w.setHeaderColor === 'function') w.setHeaderColor(__chrome);
+        if (typeof w.setBackgroundColor === 'function') w.setBackgroundColor(__chrome);
     } catch (_) {  }
 }
 
