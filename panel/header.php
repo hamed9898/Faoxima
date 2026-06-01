@@ -176,6 +176,7 @@ if (is_file($__schemaLib) && is_readable($__schemaLib)) {
 
     <div class="sidebar-section-label">مدیریت</div>
     <ul class="sidebar-menu">
+        <li><a href="sales_control.php"><span class="menu-symbol"><?php echo icon('bolt', 'svg-icon svg-sm'); ?></span><span>مرکز کنترل فروش</span></a></li>
         <li><a href="panels.php"><span class="menu-symbol"><?php echo icon('server', 'svg-icon svg-sm'); ?></span><span>مدیریت پنل‌ها</span></a></li>
         <li><a href="stock.php"><span class="menu-symbol"><?php echo icon('package', 'svg-icon svg-sm'); ?></span><span>انبار شبکه ملی</span></a></li>
         <li><a href="resellers.php"><span class="menu-symbol"><?php echo icon('user-tag', 'svg-icon svg-sm'); ?></span><span>نمایندگان</span></a></li>
